@@ -1788,6 +1788,8 @@ colorModeSelectEl.addEventListener("change", () => {
   }
 });
 
-setAuthMode("login");
+// Most visitors are first-timers, not returning users - default to Sign up
+// (a referral-link visitor especially can't possibly have an account yet).
+setAuthMode("signup");
 checkAuth();
 loadGameweek();

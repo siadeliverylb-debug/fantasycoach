@@ -35,10 +35,16 @@
 
     <div id="gameweek-bar" class="gameweek-bar"></div>
 
+    <div class="landing-value-prop">
+      <div class="landing-value-item"><span>🆓</span> 3 chat messages + 1 advice verdict, free every gameweek</div>
+      <div class="landing-value-item"><span>⚽</span> Personalized captain picks, transfers, and squad analysis</div>
+      <div class="landing-value-item"><span>💳</span> No card required to sign up</div>
+    </div>
+
     <div id="auth-section" class="auth-section">
       <div class="auth-tabs">
-        <button type="button" id="tab-login" class="tab active">Log in</button>
-        <button type="button" id="tab-signup" class="tab">Sign up</button>
+        <button type="button" id="tab-login" class="tab">Log in</button>
+        <button type="button" id="tab-signup" class="tab active">Sign up</button>
       </div>
       <form id="auth-form" class="auth-form">
         <input id="auth-email" type="email" placeholder="Email" autocomplete="email" required />
@@ -49,8 +55,8 @@
                   aria-label="Show password">👁</button>
         </div>
         <input id="auth-team-id" type="text" inputmode="numeric" placeholder="Your FPL Team ID"
-               autocomplete="off" hidden />
-        <button type="button" id="auth-team-id-help-btn" class="auth-team-id-help-btn" hidden>
+               autocomplete="off" required />
+        <button type="button" id="auth-team-id-help-btn" class="auth-team-id-help-btn">
           Where do I find my Team ID?
         </button>
         <div id="auth-team-id-help" class="auth-team-id-help" hidden>
@@ -63,12 +69,12 @@
           </ol>
         </div>
         <p id="auth-team-preview" class="auth-team-preview" hidden></p>
-        <label id="auth-agree-row" class="auth-agree-row" hidden>
+        <label id="auth-agree-row" class="auth-agree-row">
           <input type="checkbox" id="auth-agree" />
           I understand advice here is AI-generated, not guaranteed, and this site isn't
           responsible for my FPL results.
         </label>
-        <button type="submit" id="auth-submit">Log in</button>
+        <button type="submit" id="auth-submit">Sign up</button>
       </form>
       <p id="auth-error" class="auth-error"></p>
     </div>
