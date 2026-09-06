@@ -483,6 +483,7 @@ def draft_advice(req: DraftAdviceRequest, user: dict = Depends(auth.get_current_
             "element": new_player["id"],
             "name": new_player["web_name"],
             "team_short": new_player.get("team_short"),
+            "team_code": new_player.get("team_code"),
             "price_m": new_player["price_m"],
             "price_change_m": 0,
             "status": new_player.get("status"),
@@ -819,9 +820,10 @@ def captain_picks_page() -> HTMLResponse:
     <a href="/" class="pricing-cta">Get personalized advice for your own squad - free →</a>
 
     <p class="disclaimer pricing-disclaimer">
-      All advice is AI-generated from public data and may be wrong or out of date. It's
-      informational only, not a guarantee of results - you make your own FPL decisions,
-      and this site and its operator accept no responsibility for points, rank, or any
+      Fantasy Coach is an independent tool, not affiliated with or endorsed by the Premier League
+      or Fantasy Premier League. All advice is AI-generated from public data and may be wrong or
+      out of date. It's informational only, not a guarantee of results - you make your own FPL
+      decisions, and this site and its operator accept no responsibility for points, rank, or any
       other outcome from following it.
     </p>
   </div>
@@ -918,9 +920,10 @@ def differentials_page() -> HTMLResponse:
     <a href="/" class="pricing-cta">Get personalized advice for your own squad - free →</a>
 
     <p class="disclaimer pricing-disclaimer">
-      All advice is AI-generated from public data and may be wrong or out of date. It's
-      informational only, not a guarantee of results - you make your own FPL decisions,
-      and this site and its operator accept no responsibility for points, rank, or any
+      Fantasy Coach is an independent tool, not affiliated with or endorsed by the Premier League
+      or Fantasy Premier League. All advice is AI-generated from public data and may be wrong or
+      out of date. It's informational only, not a guarantee of results - you make your own FPL
+      decisions, and this site and its operator accept no responsibility for points, rank, or any
       other outcome from following it.
     </p>
   </div>

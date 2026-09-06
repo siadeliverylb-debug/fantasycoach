@@ -36,6 +36,7 @@ def _serialize_player(p: dict) -> dict[str, Any]:
         "web_name": p["web_name"],
         "team": team.get("name"),
         "team_short": team.get("short_name"),
+        "team_code": team.get("code"),
         "position": positions.get(p["element_type"]),
         "price_m": p["now_cost"] / 10,
         "form": p["form"],
@@ -388,6 +389,9 @@ def resolve_picks(picks: list[dict], gameweek: int | None = None) -> tuple[list[
             "element": p["id"],
             "name": p["web_name"],
             "team_short": teams.get(p["team"], {}).get("short_name"),
+            # FPL's own numeric club code (distinct from "id") - the key its
+            # official crest CDN uses: resources.premierleague.com/.../t{code}.png
+            "team_code": teams.get(p["team"], {}).get("code"),
             "position": positions.get(p["element_type"]),
             "price_m": p["now_cost"] / 10,
             "price_change_m": p.get("cost_change_start", 0) / 10,  # vs season start; +risen, -fallen, 0 unchanged

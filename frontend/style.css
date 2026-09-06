@@ -1491,6 +1491,10 @@ header .disclaimer {
   stroke-linejoin: round;
 }
 
+.shirt-crest {
+  filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.6));
+}
+
 /* Colored by position, not by club - real club crests/kits aren't reproduced here */
 .shirt.pos-GKP .shirt-body { fill: #f2c94c; }
 .shirt.pos-DEF .shirt-body { fill: #2f6fed; }

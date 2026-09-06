@@ -774,10 +774,18 @@ const SHIRT_SLEEVE_RIGHT_PATH = "M32,3 L36,8 L43,12 L38,20 L34,16 Z";
 const SHIRT_SLEEVE_LEFT_PATH = "M16,3 L12,8 L5,12 L10,20 L14,16 Z";
 let _jerseyPatternCounter = 0;
 
+// Official Premier League crest CDN, keyed by a club's numeric "code" field
+// (distinct from its "id") - the same badge every FPL/official PL surface
+// uses. Hotlinked, not hosted here - these are the clubs' own trademarked
+// artwork, displayed for identification only.
+function crestUrl(teamCode) {
+  return teamCode ? `https://resources.premierleague.com/premierleague/badges/50/t${teamCode}.png` : null;
+}
+
 // Builds the shirt SVG and returns the body fill to apply via the --shirt-fill
 // CSS var (a solid color, an id'd <pattern> reference for a striped kit, or
 // undefined to leave the caller's default/position-based fill alone).
-function jerseySvgMarkup(width, height, kit) {
+function jerseySvgMarkup(width, height, kit, teamCode) {
   let defs = "";
   let sleeves = "";
   let fill;
@@ -797,6 +805,8 @@ function jerseySvgMarkup(width, height, kit) {
         `<path class="shirt-sleeve" fill="${kit.secondary}" d="${SHIRT_SLEEVE_LEFT_PATH}" />`;
     }
   }
+  const url = crestUrl(teamCode);
+  const crest = url ? `<image class="shirt-crest" href="${url}" x="17.5" y="14" width="13" height="13" />` : "";
   const svg =
     `<svg class="shirt-svg" viewBox="0 0 48 44" width="${width}" height="${height}">` +
     defs +
@@ -804,6 +814,7 @@ function jerseySvgMarkup(width, height, kit) {
     sleeves +
     '<path class="shirt-sheen" d="M12,8 L16,3 Q24,9 32,3 L36,8 L30,12 Q24,15 18,12 Z" />' +
     '<path class="shirt-collar" d="M16,3 Q24,9 32,3" />' +
+    crest +
     "</svg>";
   return { svg, fill };
 }
@@ -816,7 +827,7 @@ function playerCard(p, editControls) {
   shirt.className = `shirt pos-${p.position}`;
   if (getColorMode() === "club") {
     shirt.classList.add("club-mode");
-    const { svg, fill } = jerseySvgMarkup(54, 51, TEAM_KITS[p.team_short]);
+    const { svg, fill } = jerseySvgMarkup(54, 51, TEAM_KITS[p.team_short], p.team_code);
     shirt.style.setProperty("--shirt-fill", fill || "#888888");
     shirt.innerHTML = svg;
   } else {
