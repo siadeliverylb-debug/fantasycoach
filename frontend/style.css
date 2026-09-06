@@ -667,8 +667,8 @@ header .disclaimer {
   }
 
   .shirt {
-    width: 30px;
-    height: 28px;
+    width: 40px;
+    height: 38px;
   }
 
   .player-name {
@@ -1403,8 +1403,8 @@ header .disclaimer {
 }
 
 .shirt {
-  width: 40px;
-  height: 38px;
+  width: 54px;
+  height: 51px;
   filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.45));
 }
 
@@ -1489,21 +1489,6 @@ header .disclaimer {
   stroke: rgba(0, 0, 0, 0.25);
   stroke-width: 0.75;
   stroke-linejoin: round;
-}
-
-/* Club short code on the chest, club-color mode only - a dark outline around
-   a white fill keeps it legible regardless of the kit color underneath (a
-   pale kit or a stripe crossing the text would otherwise wash it out), and
-   it's the one differentiator that still works even if two kits end up
-   looking similar. */
-.shirt-label {
-  font-size: 8px;
-  font-weight: 800;
-  font-family: inherit;
-  fill: #fff;
-  stroke: rgba(0, 0, 0, 0.65);
-  stroke-width: 1.5px;
-  paint-order: stroke fill;
 }
 
 /* Colored by position, not by club - real club crests/kits aren't reproduced here */
