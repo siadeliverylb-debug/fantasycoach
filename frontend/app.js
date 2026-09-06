@@ -735,7 +735,10 @@ const TEAM_KITS = {
   CHE: { primary: "#034694", secondary: "#FFFFFF" },
   CRY: { primary: "#1B458F", secondary: "#C4122E", pattern: "stripes" },
   EVE: { primary: "#003399", secondary: "#FFFFFF" },
-  FUL: { primary: "#FFFFFF", secondary: "#000000" },
+  // Red sleeve trim (from the crest's red "F") instead of Fulham's real black -
+  // black vs. TOT's navy read as "same dark trim on white" at a glance; red vs.
+  // navy is an unmissable hue difference regardless of size or color vision.
+  FUL: { primary: "#FFFFFF", secondary: "#C8102E" },
   HUL: { primary: "#F18A00", secondary: "#000000", pattern: "stripes" },
   IPS: { primary: "#0044A9", secondary: "#FFFFFF" },
   LEE: { primary: "#FFFFFF", secondary: "#FFD200" },
@@ -750,7 +753,10 @@ const TEAM_KITS = {
   TOT: { primary: "#FFFFFF", secondary: "#132257" },
   WHU: { primary: "#7A263A", secondary: "#1BB1E7" },
   WOL: { primary: "#FDB913", secondary: "#231F20" },
-  COV: { primary: "#78B9E7", secondary: "#0C1C8C" },
+  // Striped instead of solid+sleeve, unlike MCI - both are legitimately sky
+  // blue clubs, so a structural (pattern) difference is a stronger
+  // at-a-glance cue than a slightly different shade of the same hue.
+  COV: { primary: "#78B9E7", secondary: "#0C1C8C", pattern: "stripes" },
   MID: { primary: "#DC1414" },
   WBA: { primary: "#122F67", secondary: "#FFFFFF", pattern: "stripes" },
   SHU: { primary: "#EE2737", secondary: "#FFFFFF", pattern: "stripes" },
