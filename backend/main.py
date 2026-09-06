@@ -815,6 +815,106 @@ def captain_picks_page() -> HTMLResponse:
 {cards}
     </div>
 
+    <p class="content-crosslink"><a href="/differentials">→ This gameweek's differential picks (under 10% owned)</a></p>
+    <a href="/" class="pricing-cta">Get personalized advice for your own squad - free →</a>
+
+    <p class="disclaimer pricing-disclaimer">
+      All advice is AI-generated from public data and may be wrong or out of date. It's
+      informational only, not a guarantee of results - you make your own FPL decisions,
+      and this site and its operator accept no responsibility for points, rank, or any
+      other outcome from following it.
+    </p>
+  </div>
+</body>
+</html>
+"""
+    return HTMLResponse(html_out)
+
+
+_differentials_cache: dict = {"gameweek": None, "generated_at": 0.0, "content": None}
+_DIFFERENTIALS_CACHE_TTL_SECONDS = 12 * 60 * 60  # regenerate at most twice a day, or on gameweek rollover
+
+
+def _get_differentials_cached(gameweek: int) -> dict:
+    now = time.time()
+    if (
+        _differentials_cache["content"] is not None
+        and _differentials_cache["gameweek"] == gameweek
+        and now - _differentials_cache["generated_at"] < _DIFFERENTIALS_CACHE_TTL_SECONDS
+        # A low-ownership pick going injured/suspended is exactly the kind of
+        # update that should knock it off the page immediately, same
+        # reasoning as _captain_picks_still_fresh.
+        and _captain_picks_still_fresh(_differentials_cache["content"])
+    ):
+        return _differentials_cache["content"]
+    content = agent.get_differentials_content(gameweek)
+    _differentials_cache.update(gameweek=gameweek, generated_at=now, content=content)
+    return content
+
+
+@app.get("/differentials")
+def differentials_page() -> HTMLResponse:
+    gameweek = _current_gameweek()
+    try:
+        content = _get_differentials_cached(gameweek)
+    except Exception:
+        content = {"intro": "", "picks": []}
+
+    intro = html.escape(content.get("intro") or "")
+    picks = content.get("picks") or []
+
+    if picks:
+        cards = "\n".join(
+            f"""      <div class="captain-pick-card">
+        <div class="captain-pick-rank">#{i + 1}</div>
+        <div class="captain-pick-body">
+          <div class="captain-pick-name">{html.escape(p.get("web_name", ""))}
+            <span class="captain-pick-meta">{html.escape(p.get("position", ""))} · {html.escape(p.get("team_short", ""))} · £{p.get("price_m", 0)}m · {p.get("ownership_percent", 0)}% owned · {html.escape(p.get("opponent", ""))}</span>
+          </div>
+          <p class="captain-pick-reason">{html.escape(p.get("reason", ""))}</p>
+        </div>
+      </div>"""
+            for i, p in enumerate(picks)
+        )
+    else:
+        cards = '      <p class="captain-picks-empty">Picks for this gameweek are being put together - check back shortly.</p>'
+
+    page_title = f"Gameweek {gameweek} FPL Differentials - Fantasy Coach"
+    page_description = (
+        f"SIA's top 5 FPL differential picks for Gameweek {gameweek} - low-ownership players "
+        "with strong underlying stats. Free AI-powered Fantasy Premier League advice."
+    )
+    html_out = f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{html.escape(page_title)}</title>
+  <meta name="description" content="{html.escape(page_description)}" />
+  <link rel="canonical" href="https://fantasycoach.org/differentials" />
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="Fantasy Coach" />
+  <meta property="og:title" content="{html.escape(page_title)}" />
+  <meta property="og:description" content="{html.escape(page_description)}" />
+  <meta property="og:url" content="https://fantasycoach.org/differentials" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="{html.escape(page_title)}" />
+  <meta name="twitter:description" content="{html.escape(page_description)}" />
+  <link rel="stylesheet" href="/static/style.css?v={_asset_version("style.css")}" />
+</head>
+<body>
+  <div class="pricing-page">
+    <a href="/" class="pricing-back-link">← Back to app</a>
+    <header class="pricing-header">
+      <h1>Gameweek {gameweek} FPL Differentials</h1>
+      <p class="subtitle">{intro or "SIA's top low-ownership picks for the upcoming gameweek, backed by real stats."}</p>
+    </header>
+
+    <div class="captain-picks-list">
+{cards}
+    </div>
+
+    <p class="content-crosslink"><a href="/captain-picks">→ This gameweek's top captain picks</a></p>
     <a href="/" class="pricing-cta">Get personalized advice for your own squad - free →</a>
 
     <p class="disclaimer pricing-disclaimer">

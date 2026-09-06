@@ -531,3 +531,99 @@ def get_captain_picks_content(gameweek: int) -> dict:
         for pick in content.get("picks", []):
             pick["reason"] = strip_player_tags(pick.get("reason", ""))
         return content
+
+
+DIFFERENTIALS_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "intro": {
+            "type": "string",
+            "description": "1-2 sentence intro summarizing this gameweek's differential landscape",
+        },
+        "picks": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "element": {"type": "integer", "description": "the player's FPL element id, from the tool data"},
+                    "web_name": {"type": "string"},
+                    "team_short": {"type": "string"},
+                    "position": {"type": "string", "enum": ["GKP", "DEF", "MID", "FWD"]},
+                    "price_m": {"type": "number"},
+                    "ownership_percent": {"type": "number", "description": "selected_by_percent, from the tool data"},
+                    "opponent": {"type": "string", "description": "e.g. 'vs Coventry (H)'"},
+                    "reason": {
+                        "type": "string",
+                        "description": "1-2 sentences backed by a concrete stat (form, fixture, underlying numbers, etc.)",
+                    },
+                },
+                "required": [
+                    "element", "web_name", "team_short", "position", "price_m",
+                    "ownership_percent", "opponent", "reason",
+                ],
+                "additionalProperties": False,
+            },
+        },
+    },
+    "required": ["intro", "picks"],
+    "additionalProperties": False,
+}
+
+
+def get_differentials_content(gameweek: int) -> dict:
+    """Generates the copy for the public /differentials page - low-ownership
+    FPL picks with strong underlying stats for the upcoming gameweek, for a
+    general audience rather than any one manager's squad. Not user-specific,
+    so the caller should cache this once per gameweek rather than
+    regenerating it per visitor. Mirrors get_captain_picks_content."""
+    client = _get_client()
+    system = SYSTEM_PROMPT + (
+        "\n\nThis particular response is plain copy for a public web page, not a chat "
+        "reply - do NOT use the {{player:...}} tag syntax here, there's no chat UI to "
+        "render it into a chip. Just write each player's plain name."
+    )
+    prompt = (
+        f"Write the top 5 Fantasy Premier League differential picks for gameweek {gameweek}, "
+        "for a general public article - not tied to any one manager's squad. A differential "
+        "is a player owned by under 10% of managers with strong underlying reason to expect "
+        "points - good form, a favorable fixture, or a role change (e.g. new penalty taker, "
+        "nailed-on starter after an injury to someone ahead of them). Rank from best to "
+        "5th-best. For each pick, give one concrete reason backed by a real stat from the "
+        "tools - never from memory - and include their actual ownership percentage."
+    )
+    messages = [{"role": "user", "content": prompt}]
+
+    while True:
+        response = client.messages.create(
+            model=MODEL,
+            max_tokens=MAX_TOKENS,
+            system=system,
+            tools=tools.TOOLS,
+            messages=messages,
+            output_config={"format": {"type": "json_schema", "schema": DIFFERENTIALS_SCHEMA}},
+        )
+        _log_usage(None, "differentials", response)
+
+        if response.stop_reason == "tool_use":
+            messages.append({"role": "assistant", "content": response.content})
+            tool_results = []
+            for block in response.content:
+                if block.type == "tool_use":
+                    result = tools.call_tool(block.name, block.input)
+                    tool_results.append({
+                        "type": "tool_result",
+                        "tool_use_id": block.id,
+                        "content": json.dumps(result),
+                    })
+            messages.append({"role": "user", "content": tool_results})
+            continue
+
+        if response.stop_reason == "refusal":
+            return {"intro": "", "picks": []}
+
+        text = next((b.text for b in response.content if b.type == "text"), "{}")
+        content = json.loads(text)
+        content["intro"] = strip_player_tags(content.get("intro", ""))
+        for pick in content.get("picks", []):
+            pick["reason"] = strip_player_tags(pick.get("reason", ""))
+        return content

@@ -2258,6 +2258,21 @@ header .disclaimer {
   text-decoration: underline;
 }
 
+.content-crosslink {
+  text-align: center;
+  margin: 4px 0 18px;
+}
+
+.content-crosslink a {
+  color: var(--accent-2);
+  font-size: 0.85rem;
+  text-decoration: none;
+}
+
+.content-crosslink a:hover {
+  text-decoration: underline;
+}
+
 .checkout-modal-overlay {
   position: fixed;
   inset: 0;
