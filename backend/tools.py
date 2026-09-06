@@ -474,6 +474,17 @@ def get_user_team(team_id: int, gameweek: int | None = None, fixture_gameweek: i
     squad_value_m = squad_value_now / 10
     bank_m = entry_history.get("bank", 0) / 10
 
+    # entry_history["points"] lags behind actual play (FPL doesn't finalize it
+    # until the gameweek is fully confirmed, bonus points included), and
+    # entry["summary_event_points"] turned out not to update on the same live
+    # cadence as the per-player scores shown on each squad card either - so
+    # sum each player's own already-live gw_points_scored instead, which is
+    # the exact same event/live-backed number the squad cards already show.
+    # Only falls back to FPL's own aggregate if the live per-player fetch
+    # failed entirely (every player's gw_points_scored came back None).
+    live_scores = [p["gw_points_scored"] for p in squad if p.get("gw_points_scored") is not None]
+    gameweek_points = sum(live_scores) if live_scores else entry.get("summary_event_points")
+
     return {
         "manager_name": _strip_replacement_chars(
             f"{entry.get('player_first_name', '')} {entry.get('player_last_name', '')}".strip()
@@ -482,12 +493,7 @@ def get_user_team(team_id: int, gameweek: int | None = None, fixture_gameweek: i
         "overall_rank": entry.get("summary_overall_rank"),
         "overall_points": entry.get("summary_overall_points"),
         "gameweek": gameweek,
-        # entry_history["points"] (from the picks/history endpoints) lags behind
-        # actual play - FPL doesn't finalize it until the gameweek is fully
-        # confirmed (bonus points included). summary_event_points, from the
-        # entry endpoint we already call above, is the one FPL keeps live and
-        # matches summing each player's own live score exactly.
-        "gameweek_points": entry.get("summary_event_points"),
+        "gameweek_points": gameweek_points,
         "squad_value_m": squad_value_m,
         "bank_m": bank_m,
         "total_budget_m": round(squad_value_m + bank_m, 1),

@@ -1151,6 +1151,13 @@ async function refreshLiveSquadIfVisible() {
 }
 setInterval(refreshLiveSquadIfVisible, 60000);
 
+// Browsers throttle setInterval heavily in a backgrounded tab, so a user
+// switching back after a while could sit on a stale total until the next
+// tick - refresh immediately on return instead of waiting for it.
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") refreshLiveSquadIfVisible();
+});
+
 // ---------------------------------------------------------------------------
 // Draft formation editor
 // ---------------------------------------------------------------------------
