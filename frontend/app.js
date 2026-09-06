@@ -806,7 +806,14 @@ function jerseySvgMarkup(width, height, kit, teamCode) {
     }
   }
   const url = crestUrl(teamCode);
-  const crest = url ? `<image class="shirt-crest" href="${url}" x="17.5" y="14" width="13" height="13" />` : "";
+  // A white backing patch keeps the crest visually distinct regardless of
+  // kit color/pattern underneath (a dark kit, or a stripe crossing right
+  // behind it, would otherwise wash it out) - real shirt badges sit on a
+  // similar light patch for the same reason.
+  const crest = url
+    ? `<circle class="shirt-crest-backing" cx="24" cy="19" r="10.5" />` +
+      `<image class="shirt-crest" href="${url}" x="15" y="10" width="18" height="18" />`
+    : "";
   const svg =
     `<svg class="shirt-svg" viewBox="0 0 48 44" width="${width}" height="${height}">` +
     defs +

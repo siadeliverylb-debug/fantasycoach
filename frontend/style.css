@@ -1491,8 +1491,14 @@ header .disclaimer {
   stroke-linejoin: round;
 }
 
+.shirt-crest-backing {
+  fill: rgba(255, 255, 255, 0.92);
+  stroke: rgba(0, 0, 0, 0.2);
+  stroke-width: 0.5;
+}
+
 .shirt-crest {
-  filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.6));
+  filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.4));
 }
 
 /* Colored by position, not by club - real club crests/kits aren't reproduced here */
