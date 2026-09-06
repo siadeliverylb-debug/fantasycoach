@@ -1549,6 +1549,7 @@ header .disclaimer {
 
 .pricing-free,
 .pricing-credits-explainer,
+.pricing-payment-info,
 .pricing-compare {
   background: var(--panel);
   border: 1px solid var(--border);
