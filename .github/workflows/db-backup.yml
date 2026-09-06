@@ -1,0 +1,54 @@
+name: Backup database off-platform
+
+# Fly's own volume snapshots (30-day retention) protect against a volume
+# failure, but not against anything at the Fly account/app level (accidental
+# deletion, a compromised account, a Fly-wide incident). This workflow keeps
+# an independent, encrypted copy outside Fly entirely.
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Create a consistent backup on the volume
+        id: create
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_SSH_TOKEN }}
+        run: |
+          output=$(flyctl ssh console -a fantasycoach -C "sh -c 'cd /app && python3 -m backend.backup'")
+          path=$(echo "$output" | grep -oE '/data/backups/data-[0-9TZ]+\.db' | tail -n1)
+          if [ -z "$path" ]; then
+            echo "Could not find a backup path in the command output:"
+            echo "$output"
+            exit 1
+          fi
+          echo "path=$path" >> "$GITHUB_OUTPUT"
+
+      - name: Download the backup
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_SSH_TOKEN }}
+        run: flyctl ssh sftp get -a fantasycoach "${{ steps.create.outputs.path }}" backup.db
+
+      - name: Encrypt the backup
+        env:
+          PASSPHRASE: ${{ secrets.BACKUP_ENCRYPTION_PASSPHRASE }}
+        run: gpg --batch --yes --symmetric --cipher-algo AES256 --passphrase "$PASSPHRASE" -o backup.db.gpg backup.db
+
+      - name: Remove the remote copy
+        if: always()
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_SSH_TOKEN }}
+        run: flyctl ssh console -a fantasycoach -C "rm -f ${{ steps.create.outputs.path }}" || true
+
+      - name: Upload as a workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: db-backup-${{ github.run_id }}
+          path: backup.db.gpg
+          retention-days: 90
