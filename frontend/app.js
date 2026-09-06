@@ -118,7 +118,10 @@ function showPointsBreakdown(anchorEl, p) {
     const label = document.createElement("span");
     label.textContent = "Total";
     const value = document.createElement("span");
-    value.textContent = `${p.gw_points_scored}`;
+    // Bench players carry multiplier 0, so gw_points_scored (raw * multiplier)
+    // is always 0 regardless of how they're actually doing live - show the
+    // player's real live score (gw_points) instead for anyone not starting.
+    value.textContent = `${p.multiplier > 0 ? p.gw_points_scored : p.gw_points}`;
     row.appendChild(label);
     row.appendChild(value);
     pointsBreakdownBodyEl.appendChild(row);
@@ -748,18 +751,22 @@ function playerCard(p, editControls) {
   }
 
   if (typeof p.gw_points_scored === "number") {
+    // Bench players carry multiplier 0, so gw_points_scored (raw * multiplier)
+    // is always 0 regardless of how they're actually doing live - show the
+    // player's real live score (gw_points) instead for anyone not starting.
+    const displayPoints = p.multiplier > 0 ? p.gw_points_scored : p.gw_points;
     const pts = document.createElement("span");
     pts.className = "player-points";
     const statusClass =
       p.fixture_status === "finished" ? "status-finished" : p.fixture_status === "live" ? "status-live" : "status-not-started";
     pts.classList.add(statusClass);
-    pts.textContent = `${p.gw_points_scored}`;
+    pts.textContent = `${displayPoints}`;
     const statusLabel =
       p.fixture_status === "finished" ? "Match ended" : p.fixture_status === "live" ? "Match live" : "Not started yet";
     pts.title =
       (p.multiplier > 1
         ? `${p.gw_points} pts × ${p.multiplier} (captain) = ${p.gw_points_scored}`
-        : `${p.gw_points_scored} pts this gameweek`) + ` · ${statusLabel}`;
+        : `${displayPoints} pts this gameweek`) + ` · ${statusLabel}`;
     if (p.gw_points_breakdown && p.gw_points_breakdown.length) {
       pts.classList.add("has-breakdown");
       pts.addEventListener("click", (e) => {
