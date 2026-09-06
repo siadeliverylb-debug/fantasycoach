@@ -256,6 +256,23 @@
     <div id="points-breakdown-body" class="points-breakdown-body"></div>
   </div>
 
+  <div id="checkout-modal-overlay" class="checkout-modal-overlay" hidden>
+    <div class="checkout-modal">
+      <h3>You're about to pay with crypto</h3>
+      <p id="checkout-modal-pack" class="checkout-modal-pack"></p>
+      <p class="checkout-modal-note">
+        Payments are processed via crypto (NOWPayments) - this lets us take payments reliably as a
+        Lebanon-based team. You'll be sent to a secure page where you can pay with USDT or another
+        cryptocurrency; credits land in your account automatically within a few minutes.
+      </p>
+      <p id="checkout-modal-error" class="checkout-modal-error" hidden></p>
+      <div class="checkout-modal-actions">
+        <button type="button" id="checkout-modal-cancel" class="link-btn">Cancel</button>
+        <button type="button" id="checkout-modal-continue" class="credit-btn">Continue to secure payment</button>
+      </div>
+    </div>
+  </div>
+
   <div id="draft-search-panel" class="draft-search-panel" hidden>
     <div class="draft-search-box">
       <div class="draft-search-header">

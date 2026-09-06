@@ -23,6 +23,12 @@ const buySmallEl = document.getElementById("buy-small");
 const buyMediumEl = document.getElementById("buy-medium");
 const buyLargeEl = document.getElementById("buy-large");
 const buyGoldenEl = document.getElementById("buy-golden");
+
+const checkoutModalOverlayEl = document.getElementById("checkout-modal-overlay");
+const checkoutModalPackEl = document.getElementById("checkout-modal-pack");
+const checkoutModalErrorEl = document.getElementById("checkout-modal-error");
+const checkoutModalCancelEl = document.getElementById("checkout-modal-cancel");
+const checkoutModalContinueEl = document.getElementById("checkout-modal-continue");
 const goldenBadgeEl = document.getElementById("golden-badge");
 const logoutBtnEl = document.getElementById("logout-btn");
 const inviteBtnEl = document.getElementById("invite-btn");
@@ -660,25 +666,54 @@ promoFormEl.addEventListener("submit", async (e) => {
 // Billing
 // ---------------------------------------------------------------------------
 
-async function goToCheckout(pack) {
+let checkoutPack = null;
+
+function openCheckoutModal(pack, label) {
+  checkoutPack = pack;
+  checkoutModalPackEl.textContent = label;
+  checkoutModalErrorEl.hidden = true;
+  checkoutModalErrorEl.textContent = "";
+  checkoutModalContinueEl.disabled = false;
+  checkoutModalContinueEl.textContent = "Continue to secure payment";
+  checkoutModalOverlayEl.hidden = false;
+}
+
+function closeCheckoutModal() {
+  checkoutModalOverlayEl.hidden = true;
+  checkoutPack = null;
+}
+
+checkoutModalCancelEl.addEventListener("click", closeCheckoutModal);
+checkoutModalOverlayEl.addEventListener("click", (e) => {
+  if (e.target === checkoutModalOverlayEl) closeCheckoutModal();
+});
+
+checkoutModalContinueEl.addEventListener("click", async () => {
+  if (!checkoutPack) return;
+  checkoutModalContinueEl.disabled = true;
+  checkoutModalContinueEl.textContent = "Redirecting...";
+  checkoutModalErrorEl.hidden = true;
   try {
     const res = await fetch("/api/checkout", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pack }),
+      body: JSON.stringify({ pack: checkoutPack }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || "Could not start checkout.");
     window.location.href = data.url;
   } catch (err) {
-    alert(err.message);
+    checkoutModalErrorEl.textContent = err.message;
+    checkoutModalErrorEl.hidden = false;
+    checkoutModalContinueEl.disabled = false;
+    checkoutModalContinueEl.textContent = "Continue to secure payment";
   }
-}
+});
 
-buySmallEl.addEventListener("click", () => goToCheckout("small"));
-buyMediumEl.addEventListener("click", () => goToCheckout("medium"));
-buyLargeEl.addEventListener("click", () => goToCheckout("large"));
-buyGoldenEl.addEventListener("click", () => goToCheckout("golden"));
+buySmallEl.addEventListener("click", () => openCheckoutModal("small", "Kick-off - 5 credits - $2.49"));
+buyMediumEl.addEventListener("click", () => openCheckoutModal("medium", "Starting XI - 15 credits - $6.29"));
+buyLargeEl.addEventListener("click", () => openCheckoutModal("large", "Captain - 40 credits - $12.49"));
+buyGoldenEl.addEventListener("click", () => openCheckoutModal("golden", "Golden Boot - 60 credits + 30 days - $14.99"));
 
 // ---------------------------------------------------------------------------
 // Formation / squad pitch view
