@@ -55,6 +55,7 @@ const colorModeSelectEl = document.getElementById("color-mode-select");
 const squadViewToggleEl = document.getElementById("squad-view-toggle");
 const squadViewLiveBtnEl = document.getElementById("squad-view-live-btn");
 const squadViewNextBtnEl = document.getElementById("squad-view-next-btn");
+const pointsLegendEl = document.getElementById("points-legend");
 
 const draftBtnEl = document.getElementById("draft-btn");
 const draftToolbarEl = document.getElementById("draft-toolbar");
@@ -999,6 +1000,9 @@ function setSquadViewMode(mode) {
   squadViewMode = mode;
   squadViewLiveBtnEl.classList.toggle("active", mode === "live");
   squadViewNextBtnEl.classList.toggle("active", mode === "next");
+  // The Next Gameweek plan strips gw_points/fixture_status entirely (it's not
+  // yet played), so the points-dot legend would have nothing to explain there.
+  pointsLegendEl.hidden = mode !== "live";
 }
 
 async function loadSquad() {

@@ -1816,6 +1816,41 @@ header .disclaimer {
   50% { box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5), 0 0 0 3px rgba(0, 230, 118, 0); }
 }
 
+.points-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  justify-content: center;
+  margin-top: 10px;
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.points-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.points-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.points-legend-dot.status-not-started {
+  background: radial-gradient(circle at 35% 30%, #6fb8ff, #2f7fe0);
+}
+
+.points-legend-dot.status-live {
+  background: radial-gradient(circle at 35% 30%, #4dffa6, #00e676);
+}
+
+.points-legend-dot.status-finished {
+  background: radial-gradient(circle at 35% 30%, #ff8a80, #ff5252);
+}
+
 .player-points.has-breakdown {
   cursor: pointer;
 }
