@@ -1482,6 +1482,15 @@ header .disclaimer {
   stroke-width: 1.3;
 }
 
+/* Contrast-sleeve club kits - a thin seam stroke keeps the sleeve/body edge
+   readable even when the two colors are close (e.g. white sleeve on a pale
+   body). */
+.shirt-sleeve {
+  stroke: rgba(0, 0, 0, 0.25);
+  stroke-width: 0.75;
+  stroke-linejoin: round;
+}
+
 /* Colored by position, not by club - real club crests/kits aren't reproduced here */
 .shirt.pos-GKP .shirt-body { fill: #f2c94c; }
 .shirt.pos-DEF .shirt-body { fill: #2f6fed; }

@@ -362,7 +362,7 @@ function playerChip(name, position, action) {
 
   const shirt = document.createElement("span");
   shirt.className = `shirt mini-shirt pos-${position}`;
-  shirt.innerHTML = jerseySvgMarkup(16, 15);
+  shirt.innerHTML = jerseySvgMarkup(16, 15).svg;
   chip.appendChild(shirt);
 
   const label = document.createElement("span");
@@ -683,15 +683,43 @@ buyGoldenEl.addEventListener("click", () => goToCheckout("golden"));
 // Formation / squad pitch view
 // ---------------------------------------------------------------------------
 
-// Primary shirt color by club short code - general public knowledge of each
-// club's identity color, not any club's actual crest/kit artwork.
-const TEAM_COLORS = {
-  ARS: "#EF0107", AVL: "#670E36", BOU: "#DA020E", BRE: "#E30613", BHA: "#0057B8",
-  BUR: "#6C1D45", CHE: "#034694", CRY: "#C4122E", EVE: "#003399", FUL: "#FFFFFF",
-  HUL: "#F18A00", IPS: "#0044A9", LEE: "#FFFFFF", LEI: "#003090", LIV: "#C8102E",
-  MCI: "#6CABDD", MUN: "#DA291C", NEW: "#000000", NFO: "#DD0000", SOU: "#D71920",
-  SUN: "#EB172F", TOT: "#FFFFFF", WHU: "#7A263A", WOL: "#FDB913", COV: "#78B9E7",
-  MID: "#FF0000", WBA: "#122F67", SHU: "#EE2737", LUT: "#F36C21", NOR: "#FFF200",
+// Kit identity by club short code - general public knowledge of each club's
+// colors, not any club's actual crest/kit artwork. `secondary` renders as a
+// contrast sleeve color; `pattern: "stripes"` renders primary/secondary as
+// body stripes instead, for clubs whose identity actually is stripes - this
+// pairing (plus stripes) is what keeps otherwise similar reds/blues/whites
+// (e.g. ARS vs LIV vs NFO, or FUL vs LEE vs TOT) visually distinct.
+const TEAM_KITS = {
+  ARS: { primary: "#EF0107", secondary: "#FFFFFF" },
+  AVL: { primary: "#670E36", secondary: "#9CC7EA" },
+  BOU: { primary: "#DA020E", secondary: "#000000", pattern: "stripes" },
+  BRE: { primary: "#E30613", secondary: "#FFFFFF", pattern: "stripes" },
+  BHA: { primary: "#0057B8", secondary: "#FFFFFF", pattern: "stripes" },
+  BUR: { primary: "#6C1D45", secondary: "#5CB8E4" },
+  CHE: { primary: "#034694", secondary: "#FFFFFF" },
+  CRY: { primary: "#1B458F", secondary: "#C4122E", pattern: "stripes" },
+  EVE: { primary: "#003399", secondary: "#FFFFFF" },
+  FUL: { primary: "#FFFFFF", secondary: "#000000" },
+  HUL: { primary: "#F18A00", secondary: "#000000", pattern: "stripes" },
+  IPS: { primary: "#0044A9", secondary: "#FFFFFF" },
+  LEE: { primary: "#FFFFFF", secondary: "#FFD200" },
+  LEI: { primary: "#003090", secondary: "#FDBE11" },
+  LIV: { primary: "#C8102E", secondary: "#00B2A9" },
+  MCI: { primary: "#6CABDD", secondary: "#1C2C5B" },
+  MUN: { primary: "#DA291C", secondary: "#000000" },
+  NEW: { primary: "#241F20", secondary: "#FFFFFF", pattern: "stripes" },
+  NFO: { primary: "#DD0000", secondary: "#FFFFFF" },
+  SOU: { primary: "#D71920", secondary: "#FFFFFF", pattern: "stripes" },
+  SUN: { primary: "#EB172F", secondary: "#FFFFFF", pattern: "stripes" },
+  TOT: { primary: "#FFFFFF", secondary: "#132257" },
+  WHU: { primary: "#7A263A", secondary: "#1BB1E7" },
+  WOL: { primary: "#FDB913", secondary: "#231F20" },
+  COV: { primary: "#78B9E7", secondary: "#0C1C8C" },
+  MID: { primary: "#DC1414" },
+  WBA: { primary: "#122F67", secondary: "#FFFFFF", pattern: "stripes" },
+  SHU: { primary: "#EE2737", secondary: "#FFFFFF", pattern: "stripes" },
+  LUT: { primary: "#F36C21", secondary: "#002D62" },
+  NOR: { primary: "#FFF200", secondary: "#00A650" },
 };
 
 function getColorMode() {
@@ -702,14 +730,46 @@ function getColorMode() {
   }
 }
 
-function jerseySvgMarkup(width, height) {
-  return (
+const SHIRT_BODY_PATH = "M16,3 Q24,9 32,3 L36,8 L43,12 L38,20 L34,16 L34,42 L14,42 L14,16 L10,20 L5,12 L12,8 Z";
+// The two sleeve panels are sub-regions of SHIRT_BODY_PATH's own outline
+// (shoulder -> cuff -> underarm -> back to the torso edge) - overlaying them
+// in a second color can't leak outside the shirt silhouette.
+const SHIRT_SLEEVE_RIGHT_PATH = "M32,3 L36,8 L43,12 L38,20 L34,16 Z";
+const SHIRT_SLEEVE_LEFT_PATH = "M16,3 L12,8 L5,12 L10,20 L14,16 Z";
+let _jerseyPatternCounter = 0;
+
+// Builds the shirt SVG and returns the body fill to apply via the --shirt-fill
+// CSS var (a solid color, an id'd <pattern> reference for a striped kit, or
+// undefined to leave the caller's default/position-based fill alone).
+function jerseySvgMarkup(width, height, kit) {
+  let defs = "";
+  let sleeves = "";
+  let fill;
+  if (kit && kit.pattern === "stripes" && kit.secondary) {
+    const patternId = `stripe-${_jerseyPatternCounter++}`;
+    defs =
+      `<defs><pattern id="${patternId}" width="7" height="44" patternUnits="userSpaceOnUse">` +
+      `<rect width="7" height="44" fill="${kit.primary}" />` +
+      `<rect width="3.5" height="44" fill="${kit.secondary}" />` +
+      "</pattern></defs>";
+    fill = `url(#${patternId})`;
+  } else if (kit) {
+    fill = kit.primary;
+    if (kit.secondary) {
+      sleeves =
+        `<path class="shirt-sleeve" fill="${kit.secondary}" d="${SHIRT_SLEEVE_RIGHT_PATH}" />` +
+        `<path class="shirt-sleeve" fill="${kit.secondary}" d="${SHIRT_SLEEVE_LEFT_PATH}" />`;
+    }
+  }
+  const svg =
     `<svg class="shirt-svg" viewBox="0 0 48 44" width="${width}" height="${height}">` +
-    '<path class="shirt-body" d="M16,3 Q24,9 32,3 L36,8 L43,12 L38,20 L34,16 L34,42 L14,42 L14,16 L10,20 L5,12 L12,8 Z" />' +
+    defs +
+    `<path class="shirt-body" d="${SHIRT_BODY_PATH}" />` +
+    sleeves +
     '<path class="shirt-sheen" d="M12,8 L16,3 Q24,9 32,3 L36,8 L30,12 Q24,15 18,12 Z" />' +
     '<path class="shirt-collar" d="M16,3 Q24,9 32,3" />' +
-    "</svg>"
-  );
+    "</svg>";
+  return { svg, fill };
 }
 
 function playerCard(p, editControls) {
@@ -720,9 +780,12 @@ function playerCard(p, editControls) {
   shirt.className = `shirt pos-${p.position}`;
   if (getColorMode() === "club") {
     shirt.classList.add("club-mode");
-    shirt.style.setProperty("--shirt-fill", TEAM_COLORS[p.team_short] || "#888888");
+    const { svg, fill } = jerseySvgMarkup(40, 38, TEAM_KITS[p.team_short]);
+    shirt.style.setProperty("--shirt-fill", fill || "#888888");
+    shirt.innerHTML = svg;
+  } else {
+    shirt.innerHTML = jerseySvgMarkup(40, 38).svg;
   }
-  shirt.innerHTML = jerseySvgMarkup(40, 38);
   card.appendChild(shirt);
 
   if (p.is_captain || p.is_vice_captain) {
