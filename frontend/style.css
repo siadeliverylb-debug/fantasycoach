@@ -1491,6 +1491,21 @@ header .disclaimer {
   stroke-linejoin: round;
 }
 
+/* Club short code on the chest, club-color mode only - a dark outline around
+   a white fill keeps it legible regardless of the kit color underneath (a
+   pale kit or a stripe crossing the text would otherwise wash it out), and
+   it's the one differentiator that still works even if two kits end up
+   looking similar. */
+.shirt-label {
+  font-size: 8px;
+  font-weight: 800;
+  font-family: inherit;
+  fill: #fff;
+  stroke: rgba(0, 0, 0, 0.65);
+  stroke-width: 1.5px;
+  paint-order: stroke fill;
+}
+
 /* Colored by position, not by club - real club crests/kits aren't reproduced here */
 .shirt.pos-GKP .shirt-body { fill: #f2c94c; }
 .shirt.pos-DEF .shirt-body { fill: #2f6fed; }

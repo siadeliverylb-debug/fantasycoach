@@ -777,7 +777,11 @@ let _jerseyPatternCounter = 0;
 // Builds the shirt SVG and returns the body fill to apply via the --shirt-fill
 // CSS var (a solid color, an id'd <pattern> reference for a striped kit, or
 // undefined to leave the caller's default/position-based fill alone).
-function jerseySvgMarkup(width, height, kit) {
+// `label` (a club short code like "ARS") renders on the chest, with a
+// stroke outline so it stays legible regardless of the kit color underneath -
+// the one differentiator that works even if two kits still end up looking
+// similar, since the code itself removes any ambiguity.
+function jerseySvgMarkup(width, height, kit, label) {
   let defs = "";
   let sleeves = "";
   let fill;
@@ -797,6 +801,9 @@ function jerseySvgMarkup(width, height, kit) {
         `<path class="shirt-sleeve" fill="${kit.secondary}" d="${SHIRT_SLEEVE_LEFT_PATH}" />`;
     }
   }
+  const text = label
+    ? `<text class="shirt-label" x="24" y="31" text-anchor="middle">${label}</text>`
+    : "";
   const svg =
     `<svg class="shirt-svg" viewBox="0 0 48 44" width="${width}" height="${height}">` +
     defs +
@@ -804,6 +811,7 @@ function jerseySvgMarkup(width, height, kit) {
     sleeves +
     '<path class="shirt-sheen" d="M12,8 L16,3 Q24,9 32,3 L36,8 L30,12 Q24,15 18,12 Z" />' +
     '<path class="shirt-collar" d="M16,3 Q24,9 32,3" />' +
+    text +
     "</svg>";
   return { svg, fill };
 }
@@ -816,7 +824,7 @@ function playerCard(p, editControls) {
   shirt.className = `shirt pos-${p.position}`;
   if (getColorMode() === "club") {
     shirt.classList.add("club-mode");
-    const { svg, fill } = jerseySvgMarkup(40, 38, TEAM_KITS[p.team_short]);
+    const { svg, fill } = jerseySvgMarkup(40, 38, TEAM_KITS[p.team_short], p.team_short);
     shirt.style.setProperty("--shirt-fill", fill || "#888888");
     shirt.innerHTML = svg;
   } else {
