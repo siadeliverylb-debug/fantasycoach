@@ -1522,9 +1522,8 @@ header .disclaimer {
   text-align: center;
   line-height: 1.15;
   max-width: 76px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  word-break: break-word;
 }
 
 .pricing-page {
