@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Fantasy Coach - Admin</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div class="admin-page">
+    <a href="/" class="pricing-back-link">← Back to app</a>
+    <h1 class="admin-page-title">Admin Dashboard</h1>
+    <a href="/admin/visitors" class="admin-visitors-link">Visitor Stats →</a>
+
+    <div id="admin-gate-message" class="admin-gate-message" hidden></div>
+
+    <div id="admin-content" hidden>
+      <div class="admin-maintenance-bar">
+        <button type="button" id="maintenance-toggle-btn" class="link-btn">Enable maintenance mode</button>
+        <span id="maintenance-status" class="admin-maintenance-status"></span>
+      </div>
+      <div class="admin-summary-cards" id="admin-summary-cards"></div>
+
+      <div class="admin-promo-section">
+        <h2 class="admin-section-title">Promo Codes</h2>
+        <form id="promo-create-form" class="admin-promo-form">
+          <label for="promo-credits-input">Credits</label>
+          <input id="promo-credits-input" type="number" min="1" value="12" />
+          <button type="submit">Generate Code</button>
+        </form>
+        <p id="promo-create-result" class="admin-promo-result"></p>
+        <div class="admin-table-wrap">
+          <table id="promo-table" class="admin-table">
+            <thead>
+              <tr><th>Code</th><th>Credits</th><th>Created</th><th>Status</th><th></th></tr>
+            </thead>
+            <tbody id="promo-table-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="admin-table-wrap">
+        <table id="admin-table" class="admin-table">
+          <thead>
+            <tr>
+              <th>Email</th>
+              <th>FPL Team</th>
+              <th>Free Transfers</th>
+              <th>Team ID</th>
+              <th></th>
+              <th>Joined</th>
+              <th>Golden</th>
+              <th>Credits</th>
+              <th>Purchased</th>
+              <th>Spent</th>
+              <th>Revenue (real $)</th>
+              <th>Credit value (est.)</th>
+              <th>Tokens in/out</th>
+              <th>API calls</th>
+              <th>API cost</th>
+              <th>Margin (rev-cost)</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="admin-table-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/admin.js"></script>
+</body>
+</html>

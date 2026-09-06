@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Fantasy Coach - Visitor Stats</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div class="admin-page">
+    <a href="/admin" class="pricing-back-link">← Back to admin</a>
+    <h1 class="admin-page-title">Visitor Stats</h1>
+
+    <div id="visitors-gate-message" class="admin-gate-message" hidden></div>
+
+    <div id="visitors-content" hidden>
+      <div class="admin-maintenance-bar">
+        <button type="button" id="clear-my-visits-btn" class="link-btn">Clear my own visits from these stats</button>
+        <span id="clear-my-visits-status" class="admin-maintenance-status"></span>
+      </div>
+      <div class="admin-summary-cards" id="visitors-summary-cards"></div>
+
+      <div class="admin-promo-section">
+        <h2 class="admin-section-title">Visits by country (last 30 days)</h2>
+        <label class="admin-country-filter-label">
+          Filter everything below by country
+          <select id="visitors-country-filter">
+            <option value="">All countries</option>
+          </select>
+        </label>
+        <div class="admin-table-wrap">
+          <table id="visitors-country-table" class="admin-table">
+            <thead>
+              <tr><th>Country</th><th>Visits</th><th>Unique visitors</th></tr>
+            </thead>
+            <tbody id="visitors-country-table-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="admin-promo-section">
+        <h2 class="admin-section-title">Visits by day (last 30 days)</h2>
+        <div class="admin-table-wrap">
+          <table id="visitors-day-table" class="admin-table">
+            <thead>
+              <tr><th>Day</th><th>Visits</th><th>Unique visitors</th></tr>
+            </thead>
+            <tbody id="visitors-day-table-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="admin-promo-section">
+        <h2 class="admin-section-title">Visits by page (last 30 days)</h2>
+        <div class="admin-table-wrap">
+          <table id="visitors-path-table" class="admin-table">
+            <thead>
+              <tr><th>Page</th><th>Visits</th><th>Unique visitors</th></tr>
+            </thead>
+            <tbody id="visitors-path-table-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/visitors.js"></script>
+</body>
+</html>

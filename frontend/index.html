@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Fantasy Coach - AI Fantasy Premier League Advice</title>
+  <meta name="description" content="Get AI-powered Fantasy Premier League advice from SIA - personalized captain picks, transfer suggestions, chip strategy, and squad analysis for your FPL team. Free to start." />
+  <link rel="canonical" href="https://fantasycoach.org/" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Fantasy Coach" />
+  <meta property="og:title" content="Fantasy Coach - AI Fantasy Premier League Advice" />
+  <meta property="og:description" content="Ask SIA about players, fixtures, transfers, captaincy, or your team/league rank - personalized FPL advice powered by AI." />
+  <meta property="og:url" content="https://fantasycoach.org/" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="Fantasy Coach - AI Fantasy Premier League Advice" />
+  <meta name="twitter:description" content="Personalized Fantasy Premier League advice powered by AI - captaincy, transfers, chip strategy, and squad analysis." />
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>Fantasy Coach</h1>
+      <p class="subtitle">Ask SIA about players, fixtures, transfers, or your team/league rank.</p>
+      <p class="disclaimer">
+        All advice is AI-generated from public data and may be wrong or out of date. It's informational
+        only, not a guarantee of results — you make your own FPL decisions, and this site and its
+        operator accept no responsibility for points, rank, or any other outcome from following it.
+      </p>
+      <a href="/captain-picks" class="header-captain-picks-banner">
+        <span class="header-captain-picks-icon">🏆</span>
+        <span>See this gameweek's top captain picks</span>
+        <span class="header-captain-picks-arrow">→</span>
+      </a>
+    </header>
+
+    <div id="gameweek-bar" class="gameweek-bar"></div>
+
+    <div id="auth-section" class="auth-section">
+      <div class="auth-tabs">
+        <button type="button" id="tab-login" class="tab active">Log in</button>
+        <button type="button" id="tab-signup" class="tab">Sign up</button>
+      </div>
+      <form id="auth-form" class="auth-form">
+        <input id="auth-email" type="email" placeholder="Email" autocomplete="email" required />
+        <div class="password-field">
+          <input id="auth-password" type="password" placeholder="Password (min 8 characters)"
+                 autocomplete="current-password" required />
+          <button type="button" id="auth-password-toggle" class="password-toggle-btn"
+                  aria-label="Show password">👁</button>
+        </div>
+        <input id="auth-team-id" type="text" inputmode="numeric" placeholder="Your FPL Team ID"
+               autocomplete="off" hidden />
+        <button type="button" id="auth-team-id-help-btn" class="auth-team-id-help-btn" hidden>
+          Where do I find my Team ID?
+        </button>
+        <div id="auth-team-id-help" class="auth-team-id-help" hidden>
+          <ol>
+            <li>Log into <a href="https://fantasy.premierleague.com/" target="_blank" rel="noopener">fantasy.premierleague.com</a>
+              and open "Points" or "My Team".</li>
+            <li>Look at the page's URL - it ends in something like
+              <code>/entry/1234567/event/1</code>.</li>
+            <li>That number (<code>1234567</code> in the example) is your Team ID - copy it in below.</li>
+          </ol>
+        </div>
+        <p id="auth-team-preview" class="auth-team-preview" hidden></p>
+        <label id="auth-agree-row" class="auth-agree-row" hidden>
+          <input type="checkbox" id="auth-agree" />
+          I understand advice here is AI-generated, not guaranteed, and this site isn't
+          responsible for my FPL results.
+        </label>
+        <button type="submit" id="auth-submit">Log in</button>
+      </form>
+      <p id="auth-error" class="auth-error"></p>
+    </div>
+
+    <div id="app-section" class="app-section" hidden>
+      <div class="account-bar">
+        <span id="account-email" class="account-email"></span>
+        <span id="account-credits" class="credits-badge"></span>
+        <span id="golden-badge" class="golden-badge" hidden></span>
+        <button type="button" id="buy-small" class="credit-btn">Kick-off · +5 🪙 · $2.49</button>
+        <button type="button" id="buy-medium" class="credit-btn">Starting XI · +15 🪙 · $6.29</button>
+        <button type="button" id="buy-large" class="credit-btn">Captain · +40 🪙 · $12.49</button>
+        <button type="button" id="buy-golden" class="credit-btn golden-btn">🏆 Golden Boot · +60 🪙 &amp; 30 days · $14.99</button>
+        <button type="button" id="invite-btn" class="link-btn">Invite a friend</button>
+        <form id="promo-form" class="promo-form">
+          <input id="promo-code-input" type="text" placeholder="Have a code?" autocomplete="off" />
+          <button type="submit" class="link-btn">Redeem</button>
+        </form>
+        <span id="promo-status" class="promo-status"></span>
+        <a href="/admin" id="admin-btn" class="link-btn" hidden>Admin</a>
+        <button type="button" id="logout-btn" class="link-btn">Log out</button>
+      </div>
+
+      <form id="team-form" class="team-bar">
+        <label for="team-id">Your FPL Team ID</label>
+        <input id="team-id" type="text" inputmode="numeric" autocomplete="off"
+               placeholder="e.g. 1398600" />
+        <button type="submit" id="team-save-btn">Save</button>
+        <span id="team-status" class="team-status"></span>
+        <button type="button" id="show-formation-btn" class="formation-btn">Refresh Formation</button>
+      </form>
+
+      <div class="main-layout">
+        <div class="formation-panel">
+          <div id="squad-section" class="squad-section">
+            <div id="squad-placeholder" class="squad-placeholder">
+              Save your FPL Team ID above to see your formation.
+            </div>
+            <div id="squad-content" class="squad-content" hidden>
+              <div class="squad-header">
+                <div>
+                  <div id="squad-team-name" class="squad-team-name"></div>
+                  <div id="squad-stat-badges" class="squad-stat-badges"></div>
+                  <div id="squad-meta" class="squad-meta"></div>
+                  <div id="squad-note" class="squad-note"></div>
+                </div>
+                <div class="squad-header-actions">
+                  <div id="squad-view-toggle" class="squad-view-toggle">
+                    <button type="button" id="squad-view-live-btn" class="squad-view-btn active">Live</button>
+                    <button type="button" id="squad-view-next-btn" class="squad-view-btn">Next Gameweek</button>
+                  </div>
+                  <label class="color-mode-label">
+                    Shirt colors
+                    <select id="color-mode-select">
+                      <option value="position">By position</option>
+                      <option value="club">By club</option>
+                    </select>
+                  </label>
+                  <button type="button" id="draft-btn" class="advice-btn draft-btn">Edit Draft</button>
+                </div>
+              </div>
+
+              <div id="draft-toolbar" class="draft-toolbar" hidden>
+                <span id="draft-budget" class="draft-budget"></span>
+                <span id="draft-transfer-cost" class="draft-transfer-cost"></span>
+                <label class="draft-ft-label">
+                  Free transfers
+                  <input type="number" id="draft-free-transfers" min="0" max="5" value="1" />
+                </label>
+                <label class="draft-ft-label">
+                  Chip
+                  <select id="draft-chip-select">
+                    <option value="none">None</option>
+                    <option value="wildcard">Wildcard</option>
+                    <option value="freehit">Free Hit</option>
+                  </select>
+                </label>
+                <button type="button" id="draft-advice-btn" class="draft-advice-btn">Get Draft Advice (2 credits)</button>
+                <button type="button" id="draft-save-btn" class="draft-save-btn">Save Draft</button>
+                <button type="button" id="draft-cancel-btn" class="link-btn">Exit Draft</button>
+              </div>
+
+              <div id="squad-chips" class="squad-chips"></div>
+              <div id="pitch" class="pitch"></div>
+              <div class="bench-label">Bench</div>
+              <div id="bench" class="bench"></div>
+
+              <div id="draft-preview" class="draft-preview" hidden>
+                <div class="draft-preview-header">
+                  <div>
+                    <div class="draft-preview-title">Suggested Formation</div>
+                    <div id="draft-preview-summary" class="draft-preview-summary"></div>
+                    <div id="draft-preview-cost" class="draft-preview-cost"></div>
+                  </div>
+                  <div class="draft-preview-actions">
+                    <button type="button" id="draft-apply-btn" class="draft-save-btn">Apply Suggestions</button>
+                    <button type="button" id="draft-preview-close" class="link-btn">Dismiss</button>
+                  </div>
+                </div>
+                <div id="draft-preview-pitch" class="pitch"></div>
+                <div class="bench-label">Bench</div>
+                <div id="draft-preview-bench" class="bench"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="chat-panel">
+          <div class="chat-panel-title">Chat with SIA</div>
+          <div id="chat" class="chat"></div>
+          <div id="suggested-questions" class="suggested-questions"></div>
+          <form id="form" class="composer">
+            <input id="input" type="text" autocomplete="off" placeholder="e.g. Who should I captain this gameweek?" />
+            <button type="submit">Send</button>
+          </form>
+          <div class="chat-pricing-summary">
+            <div class="chat-pricing-title">Credit bundles</div>
+            <table class="chat-pricing-table">
+              <thead>
+                <tr><th>Pack</th><th>Credits</th><th>Price</th><th>Rate</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><span class="pack-icon pack-icon-small">⚽</span>Kick-off</td>
+                  <td>5 🪙</td><td>$2.49</td>
+                  <td>
+                    <div class="rate-cell">$0.50<div class="rate-bar-track"><div class="rate-bar-fill" style="width:100%"></div></div></div>
+                  </td>
+                </tr>
+                <tr>
+                  <td><span class="pack-icon pack-icon-medium">👕</span>Starting XI</td>
+                  <td>15 🪙</td><td>$6.29</td>
+                  <td>
+                    <div class="rate-cell">$0.42<div class="rate-bar-track"><div class="rate-bar-fill" style="width:84%"></div></div></div>
+                  </td>
+                </tr>
+                <tr>
+                  <td><span class="pack-icon pack-icon-large">C</span>Captain</td>
+                  <td>40 🪙</td><td>$12.49</td>
+                  <td>
+                    <div class="rate-cell">$0.31<div class="rate-bar-track"><div class="rate-bar-fill" style="width:62%"></div></div></div>
+                  </td>
+                </tr>
+                <tr class="chat-pricing-golden-row">
+                  <td><span class="pack-icon pack-icon-golden">🏆</span>Golden Boot</td>
+                  <td>60 🪙 + 30 days</td>
+                  <td>$14.99</td>
+                  <td>
+                    <div class="rate-cell">
+                      $0.25 <span class="best-rate-badge">Best rate</span>
+                      <div class="rate-bar-track"><div class="rate-bar-fill rate-bar-gold" style="width:50%"></div></div>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <p class="chat-pricing-note">
+              3 chats + 1 advice verdict free every gameweek · extra chat 1 credit ·
+              extra advice verdict / draft review 2 credits
+            </p>
+            <a href="/pricing" class="chat-pricing-link">Full pricing details →</a>
+            <a href="/captain-picks" class="chat-pricing-link">This gameweek's top captain picks →</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="points-breakdown-popover" class="points-breakdown-popover" hidden>
+    <div class="points-breakdown-header">
+      <span id="points-breakdown-title"></span>
+      <button type="button" id="points-breakdown-close" class="link-btn">Close</button>
+    </div>
+    <div id="points-breakdown-body" class="points-breakdown-body"></div>
+  </div>
+
+  <div id="draft-search-panel" class="draft-search-panel" hidden>
+    <div class="draft-search-box">
+      <div class="draft-search-header">
+        <span id="draft-search-title"></span>
+        <button type="button" id="draft-search-close" class="link-btn">Close</button>
+      </div>
+      <input id="draft-search-input" type="text" placeholder="Search players..." autocomplete="off" />
+      <div id="draft-search-results" class="draft-search-results"></div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

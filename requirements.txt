@@ -1,0 +1,7 @@
+fastapi>=0.115
+uvicorn[standard]>=0.30
+anthropic>=0.40
+requests>=2.31
+python-dotenv>=1.0
+itsdangerous>=2.2
+email-validator>=2.0
