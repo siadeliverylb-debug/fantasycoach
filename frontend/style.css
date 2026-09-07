@@ -1513,6 +1513,12 @@ header .disclaimer {
   fill: var(--shirt-fill, #888);
 }
 
+/* Name and team code always stay on the same line (never wrap apart, never
+   truncated with "...") - a normal space is a wrap point the browser will
+   happily use even when the name alone would fit, which is what pushed the
+   team code onto its own line below for most names. Only a genuinely long
+   name + code combo overflows the nominal 76px box slightly, which is a much
+   smaller cost than losing the team code or cutting the name off. */
 .player-name {
   margin-top: 5px;
   font-size: 0.72rem;
@@ -1522,8 +1528,7 @@ header .disclaimer {
   text-align: center;
   line-height: 1.15;
   max-width: 76px;
-  white-space: normal;
-  word-break: break-word;
+  white-space: nowrap;
 }
 
 .pricing-page {
