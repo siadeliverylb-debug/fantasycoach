@@ -70,6 +70,10 @@ header .subtitle {
   flex-shrink: 0;
 }
 
+.social-link + .social-link {
+  margin-left: 16px;
+}
+
 header .disclaimer {
   margin: 0 0 16px;
   padding: 8px 10px;
