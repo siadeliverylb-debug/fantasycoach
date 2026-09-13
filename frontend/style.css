@@ -1781,6 +1781,7 @@ header .disclaimer {
   max-width: 76px;
   line-height: 1.2;
   letter-spacing: 0.03em;
+  cursor: help;
 }
 
 .player-price {

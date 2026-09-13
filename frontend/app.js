@@ -96,12 +96,14 @@ const pointsBreakdownCloseEl = document.getElementById("points-breakdown-close")
 // gw_points_breakdown data the backend already sends (no extra API call).
 // Repeats the icon per goal/assist (capped at 3, then switches to a ×N
 // count) rather than a number prefix, so it reads as symbols at a glance
-// instead of a sentence.
+// instead of a sentence. Paired with GAMEWEEK_SUMMARY_WORD, which renders
+// the same stats as a plain-language hover tooltip, since a bare emoji row
+// on its own can be ambiguous.
 function _repeatIcon(icon, count) {
   return count > 3 ? `${icon}×${count}` : icon.repeat(count);
 }
 
-const GAMEWEEK_SUMMARY_PHRASE = {
+const GAMEWEEK_SUMMARY_ICON = {
   Goals: (v) => _repeatIcon("⚽", v),
   Assists: (v) => _repeatIcon("🅰️", v),
   "Clean sheet": () => "🛡️",
@@ -116,15 +118,39 @@ const GAMEWEEK_SUMMARY_PHRASE = {
   "Defensive contribution": () => "🛡️",
 };
 
+const GAMEWEEK_SUMMARY_WORD = {
+  Goals: (v) => `${v} goal${v > 1 ? "s" : ""}`,
+  Assists: (v) => `${v} assist${v > 1 ? "s" : ""}`,
+  "Clean sheet": () => "clean sheet",
+  "Goals conceded": (v) => `${v} conceded`,
+  "Own goals": (v) => `${v} own goal${v > 1 ? "s" : ""}`,
+  "Penalty saved": (v) => `${v} pen save${v > 1 ? "s" : ""}`,
+  "Penalty missed": () => "pen missed",
+  "Yellow card": () => "yellow card",
+  "Red card": () => "red card",
+  Saves: (v) => `${v} save${v > 1 ? "s" : ""}`,
+  Bonus: (v) => `+${v} bonus`,
+  "Defensive contribution": () => "defensive contribution",
+};
+
 function summarizePlayerGameweek(p) {
   const breakdown = p.gw_points_breakdown;
-  if (!breakdown) return ""; // fixture hasn't started yet - nothing to summarize
+  if (!breakdown) return { icons: "", words: "" }; // fixture hasn't started yet
   const minutes = breakdown.find((b) => b.label === "Minutes played");
-  if (!minutes || minutes.value === 0) return "Did not play";
-  const parts = breakdown
-    .filter((b) => b.label !== "Minutes played")
-    .map((b) => (GAMEWEEK_SUMMARY_PHRASE[b.label] ? GAMEWEEK_SUMMARY_PHRASE[b.label](b.value) : b.label.toLowerCase()));
-  return parts.length ? parts.join(" ") : "No returns";
+  if (!minutes || minutes.value === 0) {
+    return { icons: "Did not play", words: "Did not play" };
+  }
+  const notable = breakdown.filter((b) => b.label !== "Minutes played");
+  const icons = notable
+    .map((b) => (GAMEWEEK_SUMMARY_ICON[b.label] ? GAMEWEEK_SUMMARY_ICON[b.label](b.value) : b.label))
+    .join(" ");
+  const words = notable
+    .map((b) => (GAMEWEEK_SUMMARY_WORD[b.label] ? GAMEWEEK_SUMMARY_WORD[b.label](b.value) : b.label.toLowerCase()))
+    .join(", ");
+  return {
+    icons: icons || "No returns",
+    words: words || "No returns this gameweek",
+  };
 }
 
 function hidePointsBreakdown() {
@@ -955,11 +981,12 @@ function playerCard(p, editControls) {
     card.appendChild(fixture);
   }
 
-  const gameweekSummaryText = summarizePlayerGameweek(p);
-  if (gameweekSummaryText) {
+  const gwSummary = summarizePlayerGameweek(p);
+  if (gwSummary.icons) {
     const summary = document.createElement("div");
     summary.className = "player-gw-summary";
-    summary.textContent = gameweekSummaryText;
+    summary.textContent = gwSummary.icons;
+    summary.title = gwSummary.words;
     card.appendChild(summary);
   }
 
