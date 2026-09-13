@@ -93,6 +93,29 @@ write "Buy {{player:Gakpo:FWD:buy}} for Bruno G." with Bruno G. untagged - it \
 must be "Sell {{player:Bruno G.:MID:sell}} for {{player:Gakpo:FWD:buy}}" or \
 equivalent, both tagged)."""
 
+# Prompt caching: SYSTEM_PROMPT and the tool schemas are identical on every
+# single API call this module makes - across every user, every conversation,
+# and every iteration of a tool-use loop within one turn - but were being
+# resent and billed at full input price each time. Marking them as cached
+# blocks costs slightly more on a cache miss (the first call in a ~5min
+# window) but is billed at a fraction of input price on every hit after
+# that, with zero change to what the model actually sees or how it answers.
+def _cached_system(*parts: str) -> list[dict]:
+    """parts[0] is SYSTEM_PROMPT itself (identical for every caller, so it
+    gets its own cache breakpoint - the highest-value one, since it's shared
+    across the whole app's traffic). Any remaining parts (a skill playbook,
+    a team_id note) vary per user/skill, so they're joined into a second
+    cached block instead - still worth caching, since they stay identical
+    across every iteration of one call's tool-use loop."""
+    blocks = [{"type": "text", "text": parts[0], "cache_control": {"type": "ephemeral"}}]
+    rest = "".join(parts[1:])
+    if rest:
+        blocks.append({"type": "text", "text": rest, "cache_control": {"type": "ephemeral"}})
+    return blocks
+
+
+_CACHED_TOOLS = [*tools.TOOLS[:-1], {**tools.TOOLS[-1], "cache_control": {"type": "ephemeral"}}]
+
 _client = None
 
 SCOPE_DECLINE_MESSAGE = (
@@ -263,7 +286,7 @@ def _classify_message(message: str, user_id: int | None = None) -> tuple[bool, s
     response = client.messages.create(
         model=CLASSIFIER_MODEL,
         max_tokens=300,
-        system=SCOPE_CLASSIFIER_SYSTEM,
+        system=_cached_system(SCOPE_CLASSIFIER_SYSTEM),
         messages=[{"role": "user", "content": message}],
         output_config={"format": {"type": "json_schema", "schema": SCOPE_CLASSIFIER_SCHEMA}},
     )
@@ -292,11 +315,10 @@ def chat(history: list[dict], team_id: str | None = None, user_id: int | None = 
     client = _get_client()
     messages: list[dict] = [dict(m) for m in history]
 
-    system = SYSTEM_PROMPT
-    if skill:
-        system += f"\n\n{FPL_SKILLS[skill]}"
-    if team_id and team_id.strip().isdigit():
-        system += (
+    system = _cached_system(
+        SYSTEM_PROMPT,
+        f"\n\n{FPL_SKILLS[skill]}" if skill else "",
+        (
             f"\n\nThe current user's own FPL team ID is {team_id.strip()}. "
             "Use it automatically for any question about 'my team', 'my squad', "
             "'my rank', etc. without asking them for it. Your actual verdict - "
@@ -307,14 +329,16 @@ def chat(history: list[dict], team_id: str | None = None, user_id: int | None = 
             "went, whether a recent captain pick paid off, a player's last few "
             "gameweeks of returns) - ground the forward-looking advice in what "
             "actually just happened rather than giving it in a vacuum."
-        )
+            if team_id and team_id.strip().isdigit() else ""
+        ),
+    )
 
     while True:
         response = client.messages.create(
             model=MODEL,
             max_tokens=MAX_TOKENS,
             system=system,
-            tools=tools.TOOLS,
+            tools=_CACHED_TOOLS,
             messages=messages,
         )
         _log_usage(user_id, "chat", response)
@@ -395,9 +419,11 @@ def get_draft_advice_structured(
     {summary, changes: [{out_web_name, position, in_web_name, reason}, ...],
     captain_web_name, vice_web_name}."""
     client = _get_client()
-    system = SYSTEM_PROMPT
-    if team_id and team_id.strip().isdigit():
-        system += f"\n\nThe current user's own FPL team ID is {team_id.strip()}."
+    system = _cached_system(
+        SYSTEM_PROMPT,
+        f"\n\nThe current user's own FPL team ID is {team_id.strip()}."
+        if team_id and team_id.strip().isdigit() else "",
+    )
 
     prompt = (
         f"Here is my planned draft squad for gameweek {gameweek} (not yet made on the "
@@ -414,7 +440,7 @@ def get_draft_advice_structured(
             model=MODEL,
             max_tokens=MAX_TOKENS,
             system=system,
-            tools=tools.TOOLS,
+            tools=_CACHED_TOOLS,
             messages=messages,
             output_config={"format": {"type": "json_schema", "schema": DRAFT_ADVICE_SCHEMA}},
         )
@@ -481,10 +507,11 @@ def get_captain_picks_content(gameweek: int) -> dict:
     than any one manager's squad. Not user-specific, so the caller should
     cache this once per gameweek rather than regenerating it per visitor."""
     client = _get_client()
-    system = SYSTEM_PROMPT + (
+    system = _cached_system(
+        SYSTEM_PROMPT,
         "\n\nThis particular response is plain copy for a public web page, not a chat "
         "reply - do NOT use the {{player:...}} tag syntax here, there's no chat UI to "
-        "render it into a chip. Just write each player's plain name."
+        "render it into a chip. Just write each player's plain name.",
     )
     prompt = (
         f"Write the top 5 Fantasy Premier League captain picks for gameweek {gameweek}, "
@@ -500,7 +527,7 @@ def get_captain_picks_content(gameweek: int) -> dict:
             model=MODEL,
             max_tokens=MAX_TOKENS,
             system=system,
-            tools=tools.TOOLS,
+            tools=_CACHED_TOOLS,
             messages=messages,
             output_config={"format": {"type": "json_schema", "schema": CAPTAIN_PICKS_SCHEMA}},
         )
@@ -577,10 +604,11 @@ def get_differentials_content(gameweek: int) -> dict:
     so the caller should cache this once per gameweek rather than
     regenerating it per visitor. Mirrors get_captain_picks_content."""
     client = _get_client()
-    system = SYSTEM_PROMPT + (
+    system = _cached_system(
+        SYSTEM_PROMPT,
         "\n\nThis particular response is plain copy for a public web page, not a chat "
         "reply - do NOT use the {{player:...}} tag syntax here, there's no chat UI to "
-        "render it into a chip. Just write each player's plain name."
+        "render it into a chip. Just write each player's plain name.",
     )
     prompt = (
         f"Write the top 5 Fantasy Premier League differential picks for gameweek {gameweek}, "
@@ -598,7 +626,7 @@ def get_differentials_content(gameweek: int) -> dict:
             model=MODEL,
             max_tokens=MAX_TOKENS,
             system=system,
-            tools=tools.TOOLS,
+            tools=_CACHED_TOOLS,
             messages=messages,
             output_config={"format": {"type": "json_schema", "schema": DIFFERENTIALS_SCHEMA}},
         )
