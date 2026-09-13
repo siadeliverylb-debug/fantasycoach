@@ -815,6 +815,7 @@ def captain_picks_page() -> HTMLResponse:
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" type="image/png" href="/static/favicon.png?v={_asset_version("favicon.png")}" />
   <title>{html.escape(page_title)}</title>
   <meta name="description" content="{html.escape(page_description)}" />
   <link rel="canonical" href="https://fantasycoach.org/captain-picks" />
@@ -924,6 +925,7 @@ def differentials_page() -> HTMLResponse:
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" type="image/png" href="/static/favicon.png?v={_asset_version("favicon.png")}" />
   <title>{html.escape(page_title)}</title>
   <meta name="description" content="{html.escape(page_description)}" />
   <link rel="canonical" href="https://fantasycoach.org/differentials" />
@@ -977,23 +979,23 @@ def differentials_page() -> HTMLResponse:
 
 @app.get("/")
 def index() -> HTMLResponse:
-    return _render_page("index.html", "style.css", "app.js", "logo.jpg")
+    return _render_page("index.html", "style.css", "app.js", "logo.jpg", "favicon.png")
 
 
 @app.get("/pricing")
 def pricing() -> HTMLResponse:
-    return _render_page("pricing.html", "style.css", "logo.jpg")
+    return _render_page("pricing.html", "style.css", "logo.jpg", "favicon.png")
 
 
 @app.get("/admin")
 def admin_page() -> HTMLResponse:
     # Not gated here - the page's own fetches to /api/admin/* are the real
     # gate (require_admin, 403 for non-admins); this just serves the shell.
-    return _render_page("admin.html", "style.css", "admin.js")
+    return _render_page("admin.html", "style.css", "admin.js", "favicon.png")
 
 
 @app.get("/admin/visitors")
 def admin_visitors_page() -> HTMLResponse:
     # Same pattern as /admin - gated by the page's own fetch to
     # /api/admin/visitors (require_admin), not here.
-    return _render_page("visitors.html", "style.css", "visitors.js")
+    return _render_page("visitors.html", "style.css", "visitors.js", "favicon.png")
