@@ -2,6 +2,7 @@ import asyncio
 import hashlib
 import html
 import os
+import re
 import secrets
 import time
 import uuid
@@ -78,6 +79,24 @@ def _record_visit(visitor_id: str, path: str, ip: str | None, is_new_visitor: bo
     db.log_page_visit(visitor_id, path, country)
 
 
+# Search engine crawlers, uptime monitors, and scraping tools hit "/" and
+# "/pricing" just like real visitors, and previously got counted as ordinary
+# traffic in the admin visitor stats with no way to tell them apart from
+# humans - inflating "visitors" while never actually converting. A missing
+# User-Agent is treated as a bot too, since every real browser sends one.
+_BOT_USER_AGENT_RE = re.compile(
+    r"bot|crawl|spider|slurp|preview|monitor|uptimerobot|pingdom|statuscake|"
+    r"facebookexternalhit|headlesschrome|phantomjs|python-requests|scrapy|"
+    r"wget|curl|go-http-client|libwww|httpclient|okhttp|axios|node-fetch",
+    re.IGNORECASE,
+)
+
+
+def _is_bot_request(request) -> bool:
+    user_agent = request.headers.get("user-agent", "")
+    return not user_agent or bool(_BOT_USER_AGENT_RE.search(user_agent))
+
+
 @app.middleware("http")
 async def _track_page_visit(request, call_next):
     """Anonymous visit counter for the admin visitor-stats page - a random,
@@ -94,7 +113,12 @@ async def _track_page_visit(request, call_next):
         is_admin_session = bool(user and user["is_admin"])
     except Exception:
         pass
-    if not is_admin_session and request.method == "GET" and request.url.path in _TRACKED_PAGE_PATHS:
+    if (
+        not is_admin_session
+        and request.method == "GET"
+        and request.url.path in _TRACKED_PAGE_PATHS
+        and not _is_bot_request(request)
+    ):
         visitor_id = request.cookies.get("visitor_id")
         is_new_visitor = not visitor_id
         if is_new_visitor:
