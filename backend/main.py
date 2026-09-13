@@ -832,7 +832,7 @@ def captain_picks_page() -> HTMLResponse:
   <div class="pricing-page">
     <a href="/" class="pricing-back-link">← Back to app</a>
     <header class="pricing-header">
-      <img src="/static/logo.png?v={_asset_version("logo.png")}" alt="Fantasy Coach" class="site-logo" />
+      <img src="/static/logo.jpg?v={_asset_version("logo.jpg")}" alt="Fantasy Coach" class="site-logo" />
       <h1>Gameweek {gameweek} FPL Captain Picks</h1>
       <p class="subtitle">{intro or "SIA's top captain picks for the upcoming gameweek, backed by real stats."}</p>
       <a href="https://www.instagram.com/fantasy.coach.ai/" target="_blank" rel="noopener" class="social-link">
@@ -941,7 +941,7 @@ def differentials_page() -> HTMLResponse:
   <div class="pricing-page">
     <a href="/" class="pricing-back-link">← Back to app</a>
     <header class="pricing-header">
-      <img src="/static/logo.png?v={_asset_version("logo.png")}" alt="Fantasy Coach" class="site-logo" />
+      <img src="/static/logo.jpg?v={_asset_version("logo.jpg")}" alt="Fantasy Coach" class="site-logo" />
       <h1>Gameweek {gameweek} FPL Differentials</h1>
       <p class="subtitle">{intro or "SIA's top low-ownership picks for the upcoming gameweek, backed by real stats."}</p>
       <a href="https://www.instagram.com/fantasy.coach.ai/" target="_blank" rel="noopener" class="social-link">
@@ -977,12 +977,12 @@ def differentials_page() -> HTMLResponse:
 
 @app.get("/")
 def index() -> HTMLResponse:
-    return _render_page("index.html", "style.css", "app.js", "logo.png")
+    return _render_page("index.html", "style.css", "app.js", "logo.jpg")
 
 
 @app.get("/pricing")
 def pricing() -> HTMLResponse:
-    return _render_page("pricing.html", "style.css", "logo.png")
+    return _render_page("pricing.html", "style.css", "logo.jpg")
 
 
 @app.get("/admin")
