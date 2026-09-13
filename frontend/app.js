@@ -90,23 +90,30 @@ const pointsBreakdownTitleEl = document.getElementById("points-breakdown-title")
 const pointsBreakdownBodyEl = document.getElementById("points-breakdown-body");
 const pointsBreakdownCloseEl = document.getElementById("points-breakdown-close");
 
-// Short plain-language phrase per breakdown stat, for the always-visible
-// gameweek summary line on each player's card - a lighter-weight companion
-// to the click-to-expand points breakdown popover, built from the same
+// Compact icon per breakdown stat, for the always-visible gameweek summary
+// line on each player's card - a lighter-weight companion to the
+// click-to-expand points breakdown popover, built from the same
 // gw_points_breakdown data the backend already sends (no extra API call).
+// Repeats the icon per goal/assist (capped at 3, then switches to a ×N
+// count) rather than a number prefix, so it reads as symbols at a glance
+// instead of a sentence.
+function _repeatIcon(icon, count) {
+  return count > 3 ? `${icon}×${count}` : icon.repeat(count);
+}
+
 const GAMEWEEK_SUMMARY_PHRASE = {
-  Goals: (v) => `${v} goal${v > 1 ? "s" : ""}`,
-  Assists: (v) => `${v} assist${v > 1 ? "s" : ""}`,
-  "Clean sheet": () => "clean sheet",
-  "Goals conceded": (v) => `${v} conceded`,
-  "Own goals": (v) => `${v} own goal${v > 1 ? "s" : ""}`,
-  "Penalty saved": (v) => `${v} pen save${v > 1 ? "s" : ""}`,
-  "Penalty missed": () => "pen missed",
-  "Yellow card": () => "yellow card",
-  "Red card": () => "red card",
-  Saves: (v) => `${v} save${v > 1 ? "s" : ""}`,
-  Bonus: (v) => `+${v} bonus`,
-  "Defensive contribution": () => "defensive contribution",
+  Goals: (v) => _repeatIcon("⚽", v),
+  Assists: (v) => _repeatIcon("🅰️", v),
+  "Clean sheet": () => "🛡️",
+  "Goals conceded": (v) => `🥅${v}`,
+  "Own goals": (v) => `⚽OG${v > 1 ? `×${v}` : ""}`,
+  "Penalty saved": () => "🧤🎯",
+  "Penalty missed": () => "❌🎯",
+  "Yellow card": () => "🟨",
+  "Red card": () => "🟥",
+  Saves: (v) => `🧤${v}`,
+  Bonus: (v) => `⭐${v}`,
+  "Defensive contribution": () => "🛡️",
 };
 
 function summarizePlayerGameweek(p) {
@@ -117,7 +124,7 @@ function summarizePlayerGameweek(p) {
   const parts = breakdown
     .filter((b) => b.label !== "Minutes played")
     .map((b) => (GAMEWEEK_SUMMARY_PHRASE[b.label] ? GAMEWEEK_SUMMARY_PHRASE[b.label](b.value) : b.label.toLowerCase()));
-  return parts.length ? parts.join(", ") : "No returns";
+  return parts.length ? parts.join(" ") : "No returns";
 }
 
 function hidePointsBreakdown() {
