@@ -38,6 +38,13 @@ header h1 {
   color: var(--accent-2);
 }
 
+.site-logo {
+  display: block;
+  margin: 0 auto 8px;
+  height: 88px;
+  width: auto;
+}
+
 header .subtitle {
   margin: 4px 0 8px;
   color: var(--muted);
