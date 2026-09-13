@@ -90,6 +90,36 @@ const pointsBreakdownTitleEl = document.getElementById("points-breakdown-title")
 const pointsBreakdownBodyEl = document.getElementById("points-breakdown-body");
 const pointsBreakdownCloseEl = document.getElementById("points-breakdown-close");
 
+// Short plain-language phrase per breakdown stat, for the always-visible
+// gameweek summary line on each player's card - a lighter-weight companion
+// to the click-to-expand points breakdown popover, built from the same
+// gw_points_breakdown data the backend already sends (no extra API call).
+const GAMEWEEK_SUMMARY_PHRASE = {
+  Goals: (v) => `${v} goal${v > 1 ? "s" : ""}`,
+  Assists: (v) => `${v} assist${v > 1 ? "s" : ""}`,
+  "Clean sheet": () => "clean sheet",
+  "Goals conceded": (v) => `${v} conceded`,
+  "Own goals": (v) => `${v} own goal${v > 1 ? "s" : ""}`,
+  "Penalty saved": (v) => `${v} pen save${v > 1 ? "s" : ""}`,
+  "Penalty missed": () => "pen missed",
+  "Yellow card": () => "yellow card",
+  "Red card": () => "red card",
+  Saves: (v) => `${v} save${v > 1 ? "s" : ""}`,
+  Bonus: (v) => `+${v} bonus`,
+  "Defensive contribution": () => "defensive contribution",
+};
+
+function summarizePlayerGameweek(p) {
+  const breakdown = p.gw_points_breakdown;
+  if (!breakdown) return ""; // fixture hasn't started yet - nothing to summarize
+  const minutes = breakdown.find((b) => b.label === "Minutes played");
+  if (!minutes || minutes.value === 0) return "Did not play";
+  const parts = breakdown
+    .filter((b) => b.label !== "Minutes played")
+    .map((b) => (GAMEWEEK_SUMMARY_PHRASE[b.label] ? GAMEWEEK_SUMMARY_PHRASE[b.label](b.value) : b.label.toLowerCase()));
+  return parts.length ? parts.join(", ") : "No returns";
+}
+
 function hidePointsBreakdown() {
   pointsBreakdownPopoverEl.hidden = true;
 }
@@ -916,6 +946,14 @@ function playerCard(p, editControls) {
     fixture.className = "player-fixture";
     fixture.textContent = p.next_fixture;
     card.appendChild(fixture);
+  }
+
+  const gameweekSummaryText = summarizePlayerGameweek(p);
+  if (gameweekSummaryText) {
+    const summary = document.createElement("div");
+    summary.className = "player-gw-summary";
+    summary.textContent = gameweekSummaryText;
+    card.appendChild(summary);
   }
 
   if (typeof p.price_m === "number") {
