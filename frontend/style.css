@@ -45,7 +45,9 @@ header .subtitle {
 }
 
 .social-link {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   margin-bottom: 8px;
   color: var(--accent-2);
   font-size: 0.82rem;
@@ -55,6 +57,10 @@ header .subtitle {
 
 .social-link:hover {
   text-decoration: underline;
+}
+
+.social-link-icon {
+  flex-shrink: 0;
 }
 
 header .disclaimer {
