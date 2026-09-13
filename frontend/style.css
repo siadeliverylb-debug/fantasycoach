@@ -44,6 +44,19 @@ header .subtitle {
   font-size: 0.9rem;
 }
 
+.social-link {
+  display: inline-block;
+  margin-bottom: 8px;
+  color: var(--accent-2);
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.social-link:hover {
+  text-decoration: underline;
+}
+
 header .disclaimer {
   margin: 0 0 16px;
   padding: 8px 10px;

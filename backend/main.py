@@ -834,6 +834,9 @@ def captain_picks_page() -> HTMLResponse:
     <header class="pricing-header">
       <h1>Gameweek {gameweek} FPL Captain Picks</h1>
       <p class="subtitle">{intro or "SIA's top captain picks for the upcoming gameweek, backed by real stats."}</p>
+      <a href="https://www.instagram.com/fantasy.coach.ai/" target="_blank" rel="noopener" class="social-link">
+        📷 Follow on Instagram
+      </a>
     </header>
 
     <div class="captain-picks-list">
@@ -934,6 +937,9 @@ def differentials_page() -> HTMLResponse:
     <header class="pricing-header">
       <h1>Gameweek {gameweek} FPL Differentials</h1>
       <p class="subtitle">{intro or "SIA's top low-ownership picks for the upcoming gameweek, backed by real stats."}</p>
+      <a href="https://www.instagram.com/fantasy.coach.ai/" target="_blank" rel="noopener" class="social-link">
+        📷 Follow on Instagram
+      </a>
     </header>
 
     <div class="captain-picks-list">
