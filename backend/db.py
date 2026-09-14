@@ -112,6 +112,23 @@ def init_db() -> None:
                 team_id TEXT,
                 created_at TEXT NOT NULL
             );
+
+            -- Separate from chat_usage/advice_usage (website, keyed by
+            -- user_id) rather than reused for chat_id - a Telegram chat_id
+            -- is not a users.id and could coincidentally collide with one.
+            CREATE TABLE IF NOT EXISTS telegram_chat_usage (
+                chat_id INTEGER NOT NULL,
+                gameweek INTEGER NOT NULL,
+                message_count INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (chat_id, gameweek)
+            );
+
+            CREATE TABLE IF NOT EXISTS telegram_advice_usage (
+                chat_id INTEGER NOT NULL,
+                gameweek INTEGER NOT NULL,
+                use_count INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (chat_id, gameweek)
+            );
         """)
         # Lightweight migration: CREATE TABLE IF NOT EXISTS doesn't alter an
         # already-existing table, so add columns introduced after the table
@@ -746,4 +763,44 @@ def set_telegram_team_id(chat_id: int, team_id: str) -> None:
             ON CONFLICT(chat_id) DO UPDATE SET team_id = excluded.team_id
             """,
             (chat_id, team_id, datetime.now(timezone.utc).isoformat()),
+        )
+
+
+def get_telegram_chat_count(chat_id: int, gameweek: int) -> int:
+    with _connect() as conn:
+        row = conn.execute(
+            "SELECT message_count FROM telegram_chat_usage WHERE chat_id = ? AND gameweek = ?",
+            (chat_id, gameweek),
+        ).fetchone()
+    return row["message_count"] if row else 0
+
+
+def increment_telegram_chat_count(chat_id: int, gameweek: int) -> None:
+    with _connect() as conn:
+        conn.execute(
+            """
+            INSERT INTO telegram_chat_usage (chat_id, gameweek, message_count) VALUES (?, ?, 1)
+            ON CONFLICT(chat_id, gameweek) DO UPDATE SET message_count = message_count + 1
+            """,
+            (chat_id, gameweek),
+        )
+
+
+def get_telegram_advice_count(chat_id: int, gameweek: int) -> int:
+    with _connect() as conn:
+        row = conn.execute(
+            "SELECT use_count FROM telegram_advice_usage WHERE chat_id = ? AND gameweek = ?",
+            (chat_id, gameweek),
+        ).fetchone()
+    return row["use_count"] if row else 0
+
+
+def increment_telegram_advice_count(chat_id: int, gameweek: int) -> None:
+    with _connect() as conn:
+        conn.execute(
+            """
+            INSERT INTO telegram_advice_usage (chat_id, gameweek, use_count) VALUES (?, ?, 1)
+            ON CONFLICT(chat_id, gameweek) DO UPDATE SET use_count = use_count + 1
+            """,
+            (chat_id, gameweek),
         )

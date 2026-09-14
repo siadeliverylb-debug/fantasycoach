@@ -11,11 +11,25 @@ import os
 import requests
 from fastapi import APIRouter, Request
 
-from . import agent, db
+from . import agent, db, tools
 
 router = APIRouter(prefix="/api/telegram", tags=["telegram"])
 
 TELEGRAM_API_BASE = "https://api.telegram.org"
+
+# Mirrors main.py's website free tier (FREE_CHAT_MESSAGES_PER_GAMEWEEK /
+# FREE_ADVICE_USES_PER_GAMEWEEK) - kept as separate constants rather than
+# imported, since main.py imports this module and importing back would be
+# circular. No credits/Golden tier here: a Telegram chat has no website
+# account to bill against, so past the free allowance it just points people
+# at the site instead of spending credits.
+FREE_CHAT_MESSAGES_PER_GAMEWEEK = 3
+FREE_ADVICE_USES_PER_GAMEWEEK = 1
+
+LIMIT_REACHED_MESSAGE = (
+    "You've used this week's free messages here. Head to fantasycoach.org "
+    "and sign up for more - free every gameweek, plus credit packs for extra."
+)
 
 WELCOME_MESSAGE = (
     "⚽ Hey, I'm SIA - your Fantasy Premier League assistant.\n\n"
@@ -62,11 +76,29 @@ def _handle_message(chat_id: int, text: str) -> None:
             db.set_telegram_team_id(chat_id, team_id)
             _send_message(chat_id, f"Got it - team {team_id} saved. Ask me anything about your squad now.")
     else:
+        next_deadline = tools.get_next_deadline()
+        if "error" in next_deadline:
+            _send_message(chat_id, "SIA is temporarily unavailable - please try again in a moment.")
+            return
+        gameweek = next_deadline["id"]
+
+        chat_used = db.get_telegram_chat_count(chat_id, gameweek)
+        advice_used = db.get_telegram_advice_count(chat_id, gameweek)
+        if chat_used >= FREE_CHAT_MESSAGES_PER_GAMEWEEK and advice_used >= FREE_ADVICE_USES_PER_GAMEWEEK:
+            _send_message(chat_id, LIMIT_REACHED_MESSAGE)
+            return
+
         team_id = db.get_telegram_team_id(chat_id)
         try:
             reply = agent.chat([{"role": "user", "content": text}], team_id=team_id, user_id=None)
         except Exception:
-            reply = "SIA is temporarily unavailable - please try again in a moment."
+            _send_message(chat_id, "SIA is temporarily unavailable - please try again in a moment.")
+            return
+
+        if agent.reply_has_advice_tag(reply):
+            db.increment_telegram_advice_count(chat_id, gameweek)
+        else:
+            db.increment_telegram_chat_count(chat_id, gameweek)
         _send_message(chat_id, agent.strip_player_tags(reply))
 
 
