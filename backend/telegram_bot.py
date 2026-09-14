@@ -74,7 +74,13 @@ def _handle_message(chat_id: int, text: str) -> None:
             _send_message(chat_id, "That doesn't look like a team ID - it should be just numbers, e.g. /setteam 1234567")
         else:
             db.set_telegram_team_id(chat_id, team_id)
-            _send_message(chat_id, f"Got it - team {team_id} saved. Ask me anything about your squad now.")
+            _send_message(
+                chat_id,
+                f"Got it - team {team_id} saved. Ask me anything about your squad now.\n\n"
+                f"Want the full experience - live squad tracker, real club crests, and more? "
+                f"Sign up free (your team ID's already filled in):\n"
+                f"https://fantasycoach.org/?team_id={team_id}",
+            )
     else:
         next_deadline = tools.get_next_deadline()
         if "error" in next_deadline:

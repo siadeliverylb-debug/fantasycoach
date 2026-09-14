@@ -1,4 +1,5 @@
 const referralCode = new URLSearchParams(location.search).get("ref");
+const prefillTeamId = new URLSearchParams(location.search).get("team_id");
 
 const authSectionEl = document.getElementById("auth-section");
 const appSectionEl = document.getElementById("app-section");
@@ -1930,5 +1931,9 @@ colorModeSelectEl.addEventListener("change", () => {
 // Most visitors are first-timers, not returning users - default to Sign up
 // (a referral-link visitor especially can't possibly have an account yet).
 setAuthMode("signup");
+if (prefillTeamId && /^\d+$/.test(prefillTeamId)) {
+  authTeamIdEl.value = prefillTeamId;
+  authTeamIdEl.dispatchEvent(new Event("input")); // triggers the "Is this you?" team preview lookup
+}
 checkAuth();
 loadGameweek();
