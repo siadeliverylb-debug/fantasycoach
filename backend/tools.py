@@ -394,7 +394,7 @@ def resolve_picks(picks: list[dict], gameweek: int | None = None) -> tuple[list[
             "team_code": teams.get(p["team"], {}).get("code"),
             "position": positions.get(p["element_type"]),
             "price_m": p["now_cost"] / 10,
-            "price_change_m": p.get("cost_change_start", 0) / 10,  # vs season start; +risen, -fallen, 0 unchanged
+            "price_change_m": p.get("cost_change_event", 0) / 10,  # vs last week's deadline; +risen, -fallen, 0 unchanged
             "is_captain": pick["is_captain"],
             "is_vice_captain": pick["is_vice_captain"],
             "multiplier": pick["multiplier"],

@@ -998,7 +998,7 @@ function playerCard(p, editControls) {
     price.className = `player-price ${trend}`;
     price.textContent = `£${p.price_m.toFixed(1)}m`;
     if (trend !== "unchanged") {
-      price.title = `${trend === "risen" ? "Up" : "Down"} £${Math.abs(p.price_change_m).toFixed(1)}m since season start`;
+      price.title = `${trend === "risen" ? "Up" : "Down"} £${Math.abs(p.price_change_m).toFixed(1)}m since last week`;
     }
     card.appendChild(price);
   }
