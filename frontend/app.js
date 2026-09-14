@@ -996,7 +996,8 @@ function playerCard(p, editControls) {
     if (p.price_change_m > 0) trend = "risen";
     else if (p.price_change_m < 0) trend = "fallen";
     price.className = `player-price ${trend}`;
-    price.textContent = `£${p.price_m.toFixed(1)}m`;
+    const arrow = trend === "risen" ? " ▲" : trend === "fallen" ? " ▼" : "";
+    price.textContent = `£${p.price_m.toFixed(1)}m${arrow}`;
     if (trend !== "unchanged") {
       price.title = `${trend === "risen" ? "Up" : "Down"} £${Math.abs(p.price_change_m).toFixed(1)}m since last week`;
     }
