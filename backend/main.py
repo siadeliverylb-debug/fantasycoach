@@ -18,7 +18,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 load_dotenv()
 
-from . import agent, auth, billing, db, tools  # noqa: E402  (must load env before importing agent)
+from . import agent, auth, billing, db, telegram_bot, tools  # noqa: E402  (must load env before importing agent)
 
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 
@@ -149,6 +149,7 @@ if _reset_spec and ":" in _reset_spec:
 
 app.include_router(auth.router)
 app.include_router(billing.router)
+app.include_router(telegram_bot.router)
 
 FREE_CHAT_MESSAGES_PER_GAMEWEEK = 3
 FREE_ADVICE_USES_PER_GAMEWEEK = 1

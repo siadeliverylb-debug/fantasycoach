@@ -102,6 +102,16 @@ def init_db() -> None:
             );
 
             CREATE INDEX IF NOT EXISTS idx_page_visits_created_at ON page_visits(created_at);
+
+            -- Telegram has no login of its own - a chat_id stands in for a
+            -- user_id just long enough to remember which FPL team a chat is
+            -- asking about between messages. Not linked to the users table;
+            -- Telegram users don't need a website account to use the bot.
+            CREATE TABLE IF NOT EXISTS telegram_users (
+                chat_id INTEGER PRIMARY KEY,
+                team_id TEXT,
+                created_at TEXT NOT NULL
+            );
         """)
         # Lightweight migration: CREATE TABLE IF NOT EXISTS doesn't alter an
         # already-existing table, so add columns introduced after the table
@@ -716,4 +726,24 @@ def save_draft(user_id: int, team_id: str, gameweek: int, total_budget_m: float,
                 updated_at = excluded.updated_at
             """,
             (user_id, team_id, gameweek, total_budget_m, json.dumps(data), datetime.now(timezone.utc).isoformat()),
+        )
+
+
+def get_telegram_team_id(chat_id: int) -> str | None:
+    with _connect() as conn:
+        row = conn.execute(
+            "SELECT team_id FROM telegram_users WHERE chat_id = ?", (chat_id,)
+        ).fetchone()
+    return row["team_id"] if row else None
+
+
+def set_telegram_team_id(chat_id: int, team_id: str) -> None:
+    with _connect() as conn:
+        conn.execute(
+            """
+            INSERT INTO telegram_users (chat_id, team_id, created_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(chat_id) DO UPDATE SET team_id = excluded.team_id
+            """,
+            (chat_id, team_id, datetime.now(timezone.utc).isoformat()),
         )
