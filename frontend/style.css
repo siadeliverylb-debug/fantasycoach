@@ -2407,6 +2407,39 @@ header .disclaimer {
   color: #d8ffe9;
 }
 
+.landing-example {
+  margin: 14px 0;
+  padding: 16px;
+  border-radius: 10px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+}
+
+.landing-example-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--accent-2);
+  margin-bottom: 10px;
+  text-align: center;
+}
+
+.landing-example-chat {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.landing-example-chat .msg {
+  cursor: default;
+}
+
+.landing-example-note {
+  margin: 10px 0 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+  text-align: center;
+}
+
 .header-captain-picks-banner {
   display: flex;
   align-items: center;
