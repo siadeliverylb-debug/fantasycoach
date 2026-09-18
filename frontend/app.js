@@ -3,6 +3,7 @@ const prefillTeamId = new URLSearchParams(location.search).get("team_id");
 
 const authSectionEl = document.getElementById("auth-section");
 const appSectionEl = document.getElementById("app-section");
+const landingExampleEl = document.querySelector(".landing-example");
 const tabLoginEl = document.getElementById("tab-login");
 const tabSignupEl = document.getElementById("tab-signup");
 const authFormEl = document.getElementById("auth-form");
@@ -549,6 +550,7 @@ let currentUserIsAdmin = false;
 function showApp(account) {
   authSectionEl.hidden = true;
   appSectionEl.hidden = false;
+  if (landingExampleEl) landingExampleEl.hidden = true;
   currentUserId = account.id;
   currentUserIsAdmin = !!account.is_admin;
   accountEmailEl.textContent = account.email;
@@ -624,6 +626,7 @@ function setGoldenBadge(isGolden, goldenUntil) {
 function showAuth() {
   authSectionEl.hidden = false;
   appSectionEl.hidden = true;
+  if (landingExampleEl) landingExampleEl.hidden = false;
 }
 
 function setCredits(credits) {
