@@ -1,6 +1,7 @@
 import asyncio
 import hashlib
 import html
+import logging
 import os
 import re
 import secrets
@@ -21,6 +22,8 @@ load_dotenv()
 from . import agent, auth, billing, db, telegram_bot, tools  # noqa: E402  (must load env before importing agent)
 
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
+
+logger = logging.getLogger("fantasycoach")
 
 app = FastAPI(title="FPL Assistant")
 
@@ -238,6 +241,7 @@ def chat(req: ChatRequest, user: dict = Depends(auth.get_current_user)) -> ChatR
         # blip) would otherwise bubble up as a bare 500 with a plain-text body -
         # the frontend's response.json() call then throws its own confusing
         # "Failed to execute 'json' on 'Response'" instead of a real message.
+        logger.exception("agent.chat() failed for user_id=%s", user["id"])
         raise HTTPException(503, "SIA is temporarily unavailable - please try again in a moment.")
     is_advice = agent.reply_has_advice_tag(reply)
 
@@ -488,6 +492,7 @@ def draft_advice(req: DraftAdviceRequest, user: dict = Depends(auth.get_current_
     except Exception:
         # Same rationale as /api/chat's try/except - and refund the credits
         # already spent above, since the user got nothing for them.
+        logger.exception("agent.get_draft_advice_structured() failed for user_id=%s", user["id"])
         if not is_admin:
             db.add_credits(user["id"], ADVICE_CREDIT_COST)
         raise HTTPException(503, "SIA is temporarily unavailable - please try again in a moment.")

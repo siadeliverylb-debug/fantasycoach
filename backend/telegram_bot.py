@@ -6,12 +6,15 @@ which already handles that gracefully (skips usage logging, falls back to
 a team's live squad when there's no saved draft to look up)."""
 
 import asyncio
+import logging
 import os
 
 import requests
 from fastapi import APIRouter, Request
 
 from . import agent, db, tools
+
+logger = logging.getLogger("fantasycoach")
 
 router = APIRouter(prefix="/api/telegram", tags=["telegram"])
 
@@ -84,6 +87,7 @@ def _handle_message(chat_id: int, text: str) -> None:
     else:
         next_deadline = tools.get_next_deadline()
         if "error" in next_deadline:
+            logger.error("get_next_deadline() failed for chat_id=%s: %s", chat_id, next_deadline["error"])
             _send_message(chat_id, "SIA is temporarily unavailable - please try again in a moment.")
             return
         gameweek = next_deadline["id"]
@@ -98,6 +102,7 @@ def _handle_message(chat_id: int, text: str) -> None:
         try:
             reply = agent.chat([{"role": "user", "content": text}], team_id=team_id, user_id=None)
         except Exception:
+            logger.exception("agent.chat() failed for chat_id=%s", chat_id)
             _send_message(chat_id, "SIA is temporarily unavailable - please try again in a moment.")
             return
 
