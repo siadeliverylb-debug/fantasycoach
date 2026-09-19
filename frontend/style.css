@@ -75,14 +75,14 @@ header .subtitle {
 }
 
 header .disclaimer {
-  margin: 0 0 16px;
-  padding: 8px 10px;
+  margin: 0 0 10px;
+  padding: 5px 8px;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--border);
   color: var(--muted);
-  font-size: 0.72rem;
-  line-height: 1.4;
+  font-size: 0.68rem;
+  line-height: 1.35;
   max-width: 640px;
 }
 
