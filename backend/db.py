@@ -129,6 +129,15 @@ def init_db() -> None:
                 use_count INTEGER NOT NULL DEFAULT 0,
                 PRIMARY KEY (chat_id, gameweek)
             );
+
+            -- Anonymous "try SIA" box on the landing page: one row per
+            -- (UTC day, hashed IP) - the raw IP is never stored.
+            CREATE TABLE IF NOT EXISTS try_usage (
+                day TEXT NOT NULL,
+                ip_hash TEXT NOT NULL,
+                use_count INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (day, ip_hash)
+            );
         """)
         # Lightweight migration: CREATE TABLE IF NOT EXISTS doesn't alter an
         # already-existing table, so add columns introduced after the table
@@ -803,4 +812,39 @@ def increment_telegram_advice_count(chat_id: int, gameweek: int) -> None:
             ON CONFLICT(chat_id, gameweek) DO UPDATE SET use_count = use_count + 1
             """,
             (chat_id, gameweek),
+        )
+
+
+def try_reserve(day: str, ip_hash: str, per_ip_limit: int, global_limit: int) -> str:
+    """Atomically claim one anonymous try. Returns "ok", "ip" (this visitor is
+    out) or "global" (the whole site's daily cap is spent). Claimed before the
+    model call so concurrent requests can't slip past the limit; call
+    try_release() if the call then fails."""
+    with _connect() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        total = conn.execute(
+            "SELECT COALESCE(SUM(use_count), 0) AS n FROM try_usage WHERE day = ?", (day,)
+        ).fetchone()["n"]
+        if total >= global_limit:
+            return "global"
+        row = conn.execute(
+            "SELECT use_count FROM try_usage WHERE day = ? AND ip_hash = ?", (day, ip_hash)
+        ).fetchone()
+        if row and row["use_count"] >= per_ip_limit:
+            return "ip"
+        conn.execute(
+            """
+            INSERT INTO try_usage (day, ip_hash, use_count) VALUES (?, ?, 1)
+            ON CONFLICT(day, ip_hash) DO UPDATE SET use_count = use_count + 1
+            """,
+            (day, ip_hash),
+        )
+    return "ok"
+
+
+def try_release(day: str, ip_hash: str) -> None:
+    with _connect() as conn:
+        conn.execute(
+            "UPDATE try_usage SET use_count = MAX(use_count - 1, 0) WHERE day = ? AND ip_hash = ?",
+            (day, ip_hash),
         )

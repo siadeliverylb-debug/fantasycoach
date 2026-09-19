@@ -260,6 +260,49 @@ def chat(req: ChatRequest, user: dict = Depends(auth.get_current_user)) -> ChatR
     return ChatResponse(reply=reply, is_advice=is_advice, credits=db.get_credits(user["id"]))
 
 
+# Anonymous landing-page "try SIA" box. Every try costs real API money with no
+# account to bill, so it is capped per visitor and for the whole site per day.
+TRY_PER_IP_PER_DAY = 1
+TRY_GLOBAL_PER_DAY = 100
+TRY_MAX_QUESTION_CHARS = 300
+
+
+class TryRequest(BaseModel):
+    question: str
+
+
+class TryResponse(BaseModel):
+    reply: str
+
+
+@app.post("/api/try", response_model=TryResponse)
+def try_sia(req: TryRequest, request: Request) -> TryResponse:
+    _require_not_in_maintenance()
+    question = req.question.strip()
+    if not question:
+        raise HTTPException(400, "Type a question for SIA first.")
+    if len(question) > TRY_MAX_QUESTION_CHARS:
+        raise HTTPException(400, f"Keep it under {TRY_MAX_QUESTION_CHARS} characters.")
+    if _is_bot_request(request):
+        raise HTTPException(403, "Not available.")
+
+    day = time.strftime("%Y-%m-%d", time.gmtime())
+    ip_hash = hashlib.sha256(f"{day}:{_get_client_ip(request) or 'unknown'}".encode()).hexdigest()
+    outcome = db.try_reserve(day, ip_hash, TRY_PER_IP_PER_DAY, TRY_GLOBAL_PER_DAY)
+    if outcome == "ip":
+        raise HTTPException(429, "You've used your free try today - sign up free to keep asking SIA.")
+    if outcome == "global":
+        raise HTTPException(429, "Today's free tries are all used up - sign up free to ask SIA now.")
+
+    try:
+        reply = agent.chat([{"role": "user", "content": question}], team_id=None, user_id=None)
+    except Exception:
+        db.try_release(day, ip_hash)
+        logger.exception("agent.chat() failed for anonymous try")
+        raise HTTPException(503, "SIA is temporarily unavailable - please try again in a moment.")
+    return TryResponse(reply=agent.strip_player_tags(reply))
+
+
 @app.get("/api/gameweek")
 def gameweek_status() -> dict:
     result = tools.get_next_deadline()

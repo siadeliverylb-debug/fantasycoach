@@ -2140,7 +2140,8 @@ header .disclaimer {
   margin-top: 12px;
 }
 
-.composer input {
+.composer input,
+.landing-try-form input {
   flex: 1;
   padding: 12px 14px;
   border-radius: 10px;
@@ -2150,7 +2151,8 @@ header .disclaimer {
   font-size: 0.95rem;
 }
 
-.composer button {
+.composer button,
+.landing-try-form button {
   padding: 12px 20px;
   border-radius: 10px;
   border: none;
@@ -2160,7 +2162,8 @@ header .disclaimer {
   cursor: pointer;
 }
 
-.composer button:disabled {
+.composer button:disabled,
+.landing-try-form button:disabled {
   opacity: 0.6;
   cursor: default;
 }
@@ -2431,6 +2434,37 @@ header .disclaimer {
 
 .landing-example-chat .msg {
   cursor: default;
+}
+
+.landing-try {
+  margin: 14px 0;
+  padding: 16px;
+  border-radius: 10px;
+  background: var(--panel);
+  border: 1px solid var(--accent-2);
+}
+
+.landing-try-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--accent-2);
+  margin-bottom: 10px;
+  text-align: center;
+}
+
+.landing-try-form {
+  display: flex;
+  gap: 8px;
+}
+
+.landing-try-form input {
+  flex: 1;
+  min-width: 0;
+}
+
+.landing-try-reply {
+  margin-top: 12px;
+  max-width: 100%;
 }
 
 .landing-example-note {

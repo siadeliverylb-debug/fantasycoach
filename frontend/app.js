@@ -3,7 +3,7 @@ const prefillTeamId = new URLSearchParams(location.search).get("team_id");
 
 const authSectionEl = document.getElementById("auth-section");
 const appSectionEl = document.getElementById("app-section");
-const landingExampleEl = document.querySelector(".landing-example");
+const landingOnlyEls = document.querySelectorAll(".landing-example, .landing-try");
 const tabLoginEl = document.getElementById("tab-login");
 const tabSignupEl = document.getElementById("tab-signup");
 const authFormEl = document.getElementById("auth-form");
@@ -550,7 +550,7 @@ let currentUserIsAdmin = false;
 function showApp(account) {
   authSectionEl.hidden = true;
   appSectionEl.hidden = false;
-  if (landingExampleEl) landingExampleEl.hidden = true;
+  landingOnlyEls.forEach((el) => { el.hidden = true; });
   currentUserId = account.id;
   currentUserIsAdmin = !!account.is_admin;
   accountEmailEl.textContent = account.email;
@@ -626,7 +626,7 @@ function setGoldenBadge(isGolden, goldenUntil) {
 function showAuth() {
   authSectionEl.hidden = false;
   appSectionEl.hidden = true;
-  if (landingExampleEl) landingExampleEl.hidden = false;
+  landingOnlyEls.forEach((el) => { el.hidden = false; });
 }
 
 function setCredits(credits) {
@@ -1929,6 +1929,42 @@ colorModeSelectEl.addEventListener("change", () => {
   } else if (lastSquadData) {
     renderSquad(lastSquadData);
   }
+});
+
+const tryFormEl = document.getElementById("try-form");
+const tryInputEl = document.getElementById("try-input");
+const trySubmitEl = document.getElementById("try-submit");
+const tryReplyEl = document.getElementById("try-reply");
+const tryNoteEl = document.getElementById("try-note");
+
+tryFormEl.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const question = tryInputEl.value.trim();
+  if (!question) return;
+  trySubmitEl.disabled = true;
+  tryReplyEl.hidden = false;
+  tryReplyEl.classList.add("pending");
+  tryReplyEl.textContent = "SIA is thinking...";
+  try {
+    const res = await fetch("/api/try", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question }),
+    });
+    const data = await res.json().catch(() => ({}));
+    tryReplyEl.classList.remove("pending");
+    if (res.ok) {
+      tryReplyEl.textContent = data.reply;
+      tryNoteEl.textContent = "Like it? Sign up free above to ask about your own squad.";
+      tryInputEl.disabled = true;
+      return;
+    }
+    tryReplyEl.textContent = data.detail || "SIA is temporarily unavailable - please try again in a moment.";
+  } catch {
+    tryReplyEl.classList.remove("pending");
+    tryReplyEl.textContent = "SIA is temporarily unavailable - please try again in a moment.";
+  }
+  trySubmitEl.disabled = false;
 });
 
 // Most visitors are first-timers, not returning users - default to Sign up
