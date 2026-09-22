@@ -311,6 +311,11 @@ def gameweek_status() -> dict:
     return result
 
 
+@app.get("/api/news")
+def news_feed() -> list[dict]:
+    return tools.get_news_feed()
+
+
 @app.get("/api/team-preview")
 def team_preview(team_id: str) -> dict:
     """Public (pre-signup) lookup so a user can confirm the FPL team ID they're

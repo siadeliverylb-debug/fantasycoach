@@ -59,6 +59,8 @@ const squadChipsEl = document.getElementById("squad-chips");
 const pitchEl = document.getElementById("pitch");
 const benchEl = document.getElementById("bench");
 const gameweekBarEl = document.getElementById("gameweek-bar");
+const newsFeedEl = document.getElementById("news-feed");
+const newsFeedListEl = document.getElementById("news-feed-list");
 const colorModeSelectEl = document.getElementById("color-mode-select");
 const squadViewToggleEl = document.getElementById("squad-view-toggle");
 const squadViewLiveBtnEl = document.getElementById("squad-view-live-btn");
@@ -1793,6 +1795,62 @@ function markNotifiedForDeadline(iso) {
   }
 }
 
+const NEWS_STATUS_ICON = { d: "🟡", i: "🔴", s: "🔴", u: "⚪" };
+
+function _newsRelativeTime(isoString) {
+  const diffMs = Date.now() - new Date(isoString).getTime();
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
+
+async function loadNewsFeed() {
+  try {
+    const res = await fetch("/api/news");
+    if (!res.ok) return;
+    const items = await res.json();
+    if (!Array.isArray(items) || items.length === 0) {
+      newsFeedEl.hidden = true;
+      return;
+    }
+    newsFeedListEl.innerHTML = "";
+    for (const item of items) {
+      const row = document.createElement("div");
+      row.className = "news-feed-item";
+
+      const icon = document.createElement("span");
+      icon.className = "news-feed-icon";
+      icon.textContent = NEWS_STATUS_ICON[item.status] || "🟡";
+      row.appendChild(icon);
+
+      const body = document.createElement("div");
+      body.className = "news-feed-body";
+      const nameEl = document.createElement("span");
+      nameEl.className = "news-feed-name";
+      nameEl.textContent = `${item.web_name}${item.team_short ? ` (${item.team_short})` : ""}`;
+      const textEl = document.createElement("span");
+      textEl.className = "news-feed-text";
+      textEl.textContent = ` - ${item.news}`;
+      body.appendChild(nameEl);
+      body.appendChild(textEl);
+      row.appendChild(body);
+
+      const timeEl = document.createElement("span");
+      timeEl.className = "news-feed-time";
+      timeEl.textContent = _newsRelativeTime(item.news_added);
+      row.appendChild(timeEl);
+
+      newsFeedListEl.appendChild(row);
+    }
+    newsFeedEl.hidden = false;
+  } catch {
+    // best-effort widget - leave whatever was last rendered (or stay hidden)
+  }
+}
+
 async function loadGameweek() {
   try {
     const res = await fetch("/api/gameweek");
@@ -1976,3 +2034,5 @@ if (prefillTeamId && /^\d+$/.test(prefillTeamId)) {
 }
 checkAuth();
 loadGameweek();
+loadNewsFeed();
+setInterval(loadNewsFeed, 10 * 60 * 1000); // matches the backend's own 15-min FPL data cache

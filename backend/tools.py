@@ -182,6 +182,29 @@ def get_gameweek_status() -> dict:
     }
 
 
+def get_news_feed(limit: int = 15) -> list[dict]:
+    """Latest player status changes (injuries, suspensions, doubts, returns)
+    straight from bootstrap-static's per-player "news" field - the same
+    source the FPL site itself shows on a player's page. No separate news
+    API/scraper: this data is already fetched for every other tool here and
+    refreshes with the same 15-min cache, which is frequent enough for squad
+    news (unlike live match events, which need a much shorter TTL)."""
+    teams = _teams()
+    items = [
+        {
+            "web_name": p["web_name"],
+            "team_short": teams.get(p["team"], {}).get("short_name"),
+            "status": p["status"],
+            "news": p["news"],
+            "news_added": p["news_added"],
+        }
+        for p in fpl.get_bootstrap()["elements"]
+        if p.get("news") and p.get("news_added")
+    ]
+    items.sort(key=lambda x: x["news_added"], reverse=True)
+    return items[:limit]
+
+
 def get_next_deadline() -> dict:
     """Always points at the next transfer deadline that hasn't passed yet -
     based on the deadline time itself, not the event's 'finished' flag, which

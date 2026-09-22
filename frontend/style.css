@@ -97,6 +97,63 @@ header .disclaimer {
   margin-bottom: 12px;
 }
 
+.news-feed {
+  margin-bottom: 12px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+}
+
+.news-feed-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--accent-2);
+  margin-bottom: 8px;
+}
+
+.news-feed-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.news-feed-item {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.news-feed-icon {
+  flex-shrink: 0;
+  font-size: 0.6rem;
+}
+
+.news-feed-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.news-feed-name {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.news-feed-text {
+  color: var(--muted);
+}
+
+.news-feed-time {
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
 .gw-card {
   padding: 14px 18px;
   border-radius: 14px;
