@@ -762,20 +762,32 @@ checkoutModalContinueEl.addEventListener("click", async () => {
   checkoutModalContinueEl.disabled = true;
   checkoutModalContinueEl.textContent = "Redirecting...";
   checkoutModalErrorEl.hidden = true;
+  const timeoutController = new AbortController();
+  const timeoutId = setTimeout(() => timeoutController.abort(), 20000);
   try {
     const res = await fetch("/api/checkout", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ pack: checkoutPack }),
+      signal: timeoutController.signal,
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || "Could not start checkout.");
     window.location.href = data.url;
   } catch (err) {
-    checkoutModalErrorEl.textContent = err.message;
+    // A plain "Failed to fetch"/"NetworkError" (err instanceof TypeError) or an
+    // abort from the timeout above means no response ever came back - browser
+    // jargon that's meaningless to a paying user, so give them something
+    // actionable instead of surfacing it verbatim.
+    checkoutModalErrorEl.textContent =
+      err instanceof TypeError || err.name === "AbortError"
+        ? "Couldn't reach the payment server. Check your connection (or disable any ad blocker/VPN) and try again."
+        : err.message;
     checkoutModalErrorEl.hidden = false;
     checkoutModalContinueEl.disabled = false;
     checkoutModalContinueEl.textContent = "Continue to secure payment";
+  } finally {
+    clearTimeout(timeoutId);
   }
 });
 
