@@ -1005,6 +1005,17 @@ function playerCard(p, editControls) {
     summary.className = "player-gw-summary";
     summary.textContent = gwSummary.icons;
     summary.title = gwSummary.words;
+    // The native title tooltip above is a nice-to-have on desktop, but it's
+    // slow to appear and doesn't work at all on touch devices - tap/click
+    // opens the same reliable breakdown popover the points badge above
+    // already uses, so the detail is always reachable.
+    if (p.gw_points_breakdown && p.gw_points_breakdown.length) {
+      summary.classList.add("has-breakdown");
+      summary.addEventListener("click", (e) => {
+        e.stopPropagation();
+        showPointsBreakdown(summary, p);
+      });
+    }
     card.appendChild(summary);
   }
 

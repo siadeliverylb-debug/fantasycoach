@@ -1966,7 +1966,8 @@ header .disclaimer {
   background: radial-gradient(circle at 35% 30%, #ff8a80, #ff5252);
 }
 
-.player-points.has-breakdown {
+.player-points.has-breakdown,
+.player-gw-summary.has-breakdown {
   cursor: pointer;
 }
 
