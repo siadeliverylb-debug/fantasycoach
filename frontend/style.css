@@ -32,6 +32,10 @@ body {
   padding: 16px;
 }
 
+header {
+  text-align: center;
+}
+
 header h1 {
   margin: 0;
   font-size: 1.4rem;
@@ -75,7 +79,7 @@ header .subtitle {
 }
 
 header .disclaimer {
-  margin: 0 0 10px;
+  margin: 0 auto 10px;
   padding: 5px 8px;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.04);
@@ -2535,6 +2539,7 @@ header .disclaimer {
 .header-captain-picks-banner {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 10px;
   margin-top: 14px;
   padding: 12px 18px;
