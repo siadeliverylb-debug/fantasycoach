@@ -3,7 +3,7 @@ const prefillTeamId = new URLSearchParams(location.search).get("team_id");
 
 const authSectionEl = document.getElementById("auth-section");
 const appSectionEl = document.getElementById("app-section");
-const landingOnlyEls = document.querySelectorAll(".landing-example, .landing-try");
+const landingOnlyEls = document.querySelectorAll(".landing-example, .landing-try, .header-captain-picks-banner");
 const tabLoginEl = document.getElementById("tab-login");
 const tabSignupEl = document.getElementById("tab-signup");
 const authFormEl = document.getElementById("auth-form");
