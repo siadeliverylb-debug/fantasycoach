@@ -2059,3 +2059,13 @@ checkAuth();
 loadGameweek();
 loadNewsFeed();
 setInterval(loadNewsFeed, 10 * 60 * 1000); // matches the backend's own 15-min FPL data cache
+
+// Fire-and-forget: only counts as a visit once the page has actually loaded
+// and run this script, which a plain HTML fetch (scraper/bot with a spoofed
+// browser User-Agent, curl, etc.) never does - see /api/visit on the backend.
+fetch("/api/visit", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ path: "/" }),
+  keepalive: true,
+}).catch(() => {});

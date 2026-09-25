@@ -101,13 +101,17 @@ def _is_bot_request(request) -> bool:
 
 
 @app.middleware("http")
-async def _track_page_visit(request, call_next):
-    """Anonymous visit counter for the admin visitor-stats page - a random,
-    long-lived cookie (separate from the login session) identifies repeat
-    visitors. Country is looked up once per new visitor (not stored as a raw
-    IP) and remembered for their later visits instead of a fresh API call
-    each time. The lookup + DB write run in a background thread so a slow or
-    rate-limited geolocation call never delays the page response itself."""
+async def _issue_visitor_cookie(request, call_next):
+    """Issues the anonymous visitor_id cookie (separate from the login
+    session) on tracked pages - but does NOT log a visit here. The actual
+    visit is only recorded by the /api/visit beacon below, called from
+    client-side JS once the page has actually loaded and run: a plain
+    server-side GET / hit is trivially produced by any script or scraper
+    that fetches the raw HTML with a spoofed browser User-Agent (common
+    among scrapers specifically to slip past _is_bot_request) and never
+    executes JavaScript at all, which was silently inflating "visitors" with
+    non-human traffic that could never have signed up. Requiring the page to
+    actually run before a visit counts filters that out."""
     response = await call_next(request)
     is_admin_session = False
     try:
@@ -120,19 +124,37 @@ async def _track_page_visit(request, call_next):
         not is_admin_session
         and request.method == "GET"
         and request.url.path in _TRACKED_PAGE_PATHS
-        and not _is_bot_request(request)
+        and not request.cookies.get("visitor_id")
     ):
-        visitor_id = request.cookies.get("visitor_id")
-        is_new_visitor = not visitor_id
-        if is_new_visitor:
-            visitor_id = uuid.uuid4().hex
-            response.set_cookie(
-                "visitor_id", visitor_id, max_age=365 * 24 * 3600,
-                httponly=True, secure=True, samesite="lax",
-            )
-        ip = _get_client_ip(request)
-        asyncio.create_task(asyncio.to_thread(_record_visit, visitor_id, request.url.path, ip, is_new_visitor))
+        response.set_cookie(
+            "visitor_id", uuid.uuid4().hex, max_age=365 * 24 * 3600,
+            httponly=True, secure=True, samesite="lax",
+        )
     return response
+
+
+class VisitBeacon(BaseModel):
+    path: str
+
+
+@app.post("/api/visit")
+def record_visit(req: VisitBeacon, request: Request) -> dict:
+    if req.path not in _TRACKED_PAGE_PATHS:
+        raise HTTPException(400, "Unknown path.")
+    try:
+        user_id = request.session.get("user_id")
+        user = db.get_user(user_id) if user_id else None
+        if user and user["is_admin"]:
+            return {"ok": False}
+    except Exception:
+        pass
+    visitor_id = request.cookies.get("visitor_id")
+    if not visitor_id or _is_bot_request(request):
+        return {"ok": False}
+    is_new_visitor = db.get_last_country(visitor_id) is None
+    ip = _get_client_ip(request)
+    asyncio.create_task(asyncio.to_thread(_record_visit, visitor_id, req.path, ip, is_new_visitor))
+    return {"ok": True}
 
 
 db.init_db()
@@ -664,7 +686,7 @@ def admin_visitors(days: int = 30, country: str | None = None, admin: dict = Dep
 def clear_my_visits(request: Request, admin: dict = Depends(require_admin)) -> dict:
     """Wipes the current browser's own visitor_id from the stats - for
     clearing out an admin's own dev/testing traffic. Going forward, an admin
-    session's page views aren't logged at all (see _track_page_visit), so
+    session's page views aren't logged at all (see /api/visit), so
     this is only needed once to clean up whatever was already recorded."""
     visitor_id = request.cookies.get("visitor_id")
     if not visitor_id:

@@ -188,5 +188,16 @@
       other outcome from following it.
     </p>
   </div>
+  <script>
+    // Only counts as a visit once this actually runs in a real browser - see
+    // /api/visit on the backend for why (filters out scrapers/bots that fetch
+    // the raw HTML with a spoofed browser User-Agent but never execute JS).
+    fetch("/api/visit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: "/pricing" }),
+      keepalive: true,
+    }).catch(() => {});
+  </script>
 </body>
 </html>
