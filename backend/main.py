@@ -153,7 +153,10 @@ def record_visit(req: VisitBeacon, request: Request) -> dict:
         return {"ok": False}
     is_new_visitor = db.get_last_country(visitor_id) is None
     ip = _get_client_ip(request)
-    asyncio.create_task(asyncio.to_thread(_record_visit, visitor_id, req.path, ip, is_new_visitor))
+    # A plain sync def, unlike the old middleware - FastAPI already runs it in
+    # a worker thread, so the blocking DB write + geolocation call don't need
+    # (and, called from a thread with no running loop, can't use) asyncio.
+    _record_visit(visitor_id, req.path, ip, is_new_visitor)
     return {"ok": True}
 
 
