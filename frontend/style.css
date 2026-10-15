@@ -2541,7 +2541,7 @@ header .disclaimer {
   align-items: center;
   justify-content: center;
   gap: 10px;
-  margin-top: 14px;
+  margin: 14px auto 0;
   padding: 12px 18px;
   border-radius: 12px;
   background: linear-gradient(90deg, rgba(0, 230, 118, 0.18), rgba(0, 230, 118, 0.06));
