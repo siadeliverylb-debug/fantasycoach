@@ -1,20 +1,19 @@
-"""NOWPayments checkout + IPN webhook for one-time credit-pack purchases.
+"""Whish Pay checkout + callback handling for one-time credit-pack purchases.
 
-NOWPayments (https://nowpayments.io) is a non-custodial crypto payment
-processor, used here because mainstream card processors (Stripe, Tap, Areeba,
-MyFatoorah, Lemon Squeezy) all refuse or heavily restrict merchants
-registered in Lebanon - crypto payments route around that banking
-restriction entirely, since settlement is a wallet-to-wallet transfer rather
-than a bank rail. See NOWPayments API docs: https://documenter.getpostman.com/view/7907941/S1a32n38
+Whish Pay (https://whish.money) is a Lebanese payment provider - used here
+because mainstream card processors (Stripe, Tap, Areeba, MyFatoorah, Lemon
+Squeezy) all refuse or heavily restrict merchants registered in Lebanon,
+while Whish is itself Lebanese and accepts a Lebanon-registered merchant
+directly. Replaced the earlier NOWPayments crypto integration (requiring a
+payer to already hold USDT) now that a mainstream-payment option exists.
+API reference: https://whish-partners.pages.dev/whish-pay-9z366gc6922w/
 """
 
-import hashlib
-import hmac
-import json
 import os
+import uuid
 
 import requests
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel
 
 from . import db
@@ -23,7 +22,14 @@ from .auth import get_current_user
 router = APIRouter(prefix="/api", tags=["billing"])
 
 BASE_URL = os.environ.get("BASE_URL", "http://localhost:8000")
-NOWPAYMENTS_API_BASE = "https://api.nowpayments.io/v1"
+
+WHISH_SANDBOX_BASE = "https://partner.api.sbx.whish.money/itel-service/api"
+WHISH_PRODUCTION_BASE = "https://api.whish.money/itel-service/api"
+# Defaults to sandbox so a missing/unset WHISH_ENV can never accidentally
+# point real checkout traffic at the production API with sandbox-only
+# credentials - set WHISH_ENV=production (and swap WHISH_CHANNEL/WHISH_SECRET
+# to the production pair Whish issues separately) only once that pair exists.
+WHISH_BASE = WHISH_PRODUCTION_BASE if os.environ.get("WHISH_ENV") == "production" else WHISH_SANDBOX_BASE
 
 CREDIT_PACKS: dict[str, dict] = {
     # Dict keys are the API contract used by /api/checkout and the frontend's
@@ -51,18 +57,41 @@ class CheckoutResponse(BaseModel):
     url: str
 
 
-def _get_api_key() -> str:
-    key = os.environ.get("NOWPAYMENTS_API_KEY")
-    if not key:
-        raise HTTPException(500, "NOWPayments is not configured (NOWPAYMENTS_API_KEY missing).")
-    return key
+def _whish_headers() -> dict[str, str]:
+    channel = os.environ.get("WHISH_CHANNEL")
+    secret = os.environ.get("WHISH_SECRET")
+    website_url = os.environ.get("WHISH_WEBSITE_URL")
+    if not channel or not secret or not website_url:
+        raise HTTPException(500, "Whish Pay is not configured (WHISH_CHANNEL/WHISH_SECRET/WHISH_WEBSITE_URL missing).")
+    return {
+        "channel": channel,
+        "secret": secret,
+        "websiteUrl": website_url,
+        "Content-Type": "application/json",
+        # Required by Whish, identifying the calling app - not their own keys.
+        "User-Agent": "FantasyCoach/1.0 (https://fantasycoach.org; sia.delivery.lb@gmail.com)",
+    }
 
 
-def _get_ipn_secret() -> str:
-    secret = os.environ.get("NOWPAYMENTS_IPN_SECRET")
-    if not secret:
-        raise HTTPException(500, "NOWPayments is not configured (NOWPAYMENTS_IPN_SECRET missing).")
-    return secret
+def _encode_external_id(user_id: int, pack_key: str) -> str:
+    """Packs user_id + pack into the externalId itself (mirrors the old
+    NOWPayments order_id trick) so the GET callback - which Whish fires with
+    no body, only whatever query params we attached at creation time - can be
+    decoded without a separate pending-payments table. The random suffix is
+    what actually satisfies Whish's "must be unique per payment" requirement;
+    pack keys are hyphen-free by construction so the split below is safe."""
+    return f"user-{user_id}-{pack_key}-{uuid.uuid4().hex[:10]}"
+
+
+def _decode_external_id(external_id: str) -> tuple[int, str] | None:
+    parts = external_id.split("-", 2)
+    if len(parts) != 3 or parts[0] != "user":
+        return None
+    pack_key = parts[2].rsplit("-", 1)[0]  # drop the trailing random suffix
+    try:
+        return int(parts[1]), pack_key
+    except ValueError:
+        return None
 
 
 @router.post("/checkout")
@@ -71,80 +100,75 @@ def create_checkout(req: CheckoutRequest, user: dict = Depends(get_current_user)
     if not pack:
         raise HTTPException(400, "pack must be 'small', 'medium', 'large', or 'golden'.")
 
-    api_key = _get_api_key()
-
-    # user_id/pack are re-derived from order_id in the webhook instead of a
-    # dedicated metadata field - NOWPayments' invoice endpoint has no
-    # arbitrary metadata dict (unlike Tap's), so order_id doubles as it.
+    external_id = _encode_external_id(user["id"], req.pack)
     payload = {
-        "price_amount": round(pack["amount_cents"] / 100, 2),
-        "price_currency": "usd",
-        "order_id": f"user-{user['id']}-{req.pack}",
-        "order_description": f"Fantasy Coach - {pack['label']}",
-        "ipn_callback_url": f"{BASE_URL}/api/webhook/nowpayments",
-        "success_url": f"{BASE_URL}/?checkout=success",
-        "cancel_url": f"{BASE_URL}/?checkout=cancel",
+        "amount": f"{pack['amount_cents'] / 100:.2f}",
+        "currency": "USD",
+        "invoice": pack["label"],
+        "externalId": external_id,
+        "successCallbackUrl": f"{BASE_URL}/api/webhook/whish?external_id={external_id}&result=success",
+        "failureCallbackUrl": f"{BASE_URL}/api/webhook/whish?external_id={external_id}&result=failure",
+        "successRedirectUrl": f"{BASE_URL}/?checkout=success",
+        "failureRedirectUrl": f"{BASE_URL}/?checkout=cancel",
     }
 
     try:
+        resp = requests.post(f"{WHISH_BASE}/payment/whish", json=payload, headers=_whish_headers(), timeout=15)
+    except requests.RequestException as e:
+        raise HTTPException(502, f"Could not reach Whish Pay: {e}")
+
+    body = resp.json() if resp.content else {}
+    # Whish's own success/failure signal is the body's "status" field, not the
+    # HTTP status code - a 200 can still carry status: false.
+    if not body.get("status"):
+        raise HTTPException(502, f"Whish Pay error: {body.get('code')} {body.get('dialog') or ''}".strip())
+
+    collect_url = (body.get("data") or {}).get("collectUrl")
+    if not collect_url:
+        raise HTTPException(502, "Whish Pay did not return a payment link.")
+    return CheckoutResponse(url=collect_url)
+
+
+def _confirm_and_credit(user_id: int, pack_key: str, external_id: str) -> None:
+    pack = CREDIT_PACKS.get(pack_key)
+    if not pack:
+        return
+    try:
         resp = requests.post(
-            f"{NOWPAYMENTS_API_BASE}/invoice",
-            json=payload,
-            headers={"x-api-key": api_key, "Content-Type": "application/json"},
+            f"{WHISH_BASE}/payment/collect/status",
+            json={"currency": "USD", "externalId": external_id},
+            headers=_whish_headers(),
             timeout=15,
         )
-    except requests.RequestException as e:
-        raise HTTPException(502, f"Could not reach NOWPayments: {e}")
+        status = (resp.json().get("data") or {}).get("collectStatus")
+    except (requests.RequestException, ValueError):
+        return  # best-effort - an unconfirmed payment is simply not credited yet
 
-    if resp.status_code >= 400:
-        raise HTTPException(502, f"NOWPayments error: {resp.text}")
+    if status != "success":
+        return  # pending/failed/refunded/unknown - never credit on anything but a confirmed success
 
-    invoice_url = resp.json().get("invoice_url")
-    if not invoice_url:
-        raise HTTPException(502, "NOWPayments did not return an invoice URL.")
-    return CheckoutResponse(url=invoice_url)
-
-
-def _nowpayments_signature(body: dict, ipn_secret: str) -> str:
-    """Reproduces NOWPayments' IPN signature: top-level keys sorted
-    alphabetically, compact (no-whitespace) JSON, HMAC-SHA512 with the IPN
-    secret - matching the reference PHP/Node examples in their docs."""
-    sorted_body = dict(sorted(body.items()))
-    payload_str = json.dumps(sorted_body, separators=(",", ":"), ensure_ascii=False)
-    return hmac.new(ipn_secret.encode(), payload_str.encode(), hashlib.sha512).hexdigest()
+    # record_purchase is the dedup gate (UNIQUE on provider_reference): only
+    # credit if this externalId hasn't been recorded before, so a duplicate
+    # callback delivery (or a callback arriving after we'd already polled and
+    # credited it) can't double-credit.
+    is_new_payment = db.record_purchase(user_id, pack["credits"], pack["amount_cents"], provider_reference=external_id)
+    if is_new_payment:
+        db.add_credits(user_id, pack["credits"])
+        golden_days = pack.get("golden_days", 0)
+        if golden_days:
+            db.extend_golden(user_id, golden_days)
 
 
-@router.post("/webhook/nowpayments", status_code=200)
-async def nowpayments_webhook(request: Request) -> dict:
-    body = await request.json()
-    signature = request.headers.get("x-nowpayments-sig", "")
-    ipn_secret = _get_ipn_secret()
-
-    expected = _nowpayments_signature(body, ipn_secret)
-    if not hmac.compare_digest(expected, signature):
-        raise HTTPException(400, "Invalid webhook signature.")
-
-    if body.get("payment_status") == "finished":
-        order_id = body.get("order_id") or ""
-        parts = order_id.split("-", 2)
-        if len(parts) == 3 and parts[0] == "user":
-            try:
-                user_id = int(parts[1])
-            except ValueError:
-                user_id = 0
-            pack = CREDIT_PACKS.get(parts[2])
-            payment_id = body.get("payment_id")
-            if user_id and pack and payment_id:
-                # record_purchase is the dedup gate (UNIQUE on provider_reference):
-                # only credit if this exact payment hasn't been recorded before,
-                # so a replayed/retried webhook delivery can't double-credit.
-                is_new_payment = db.record_purchase(
-                    user_id, pack["credits"], pack["amount_cents"], provider_reference=str(payment_id)
-                )
-                if is_new_payment:
-                    db.add_credits(user_id, pack["credits"])
-                    golden_days = pack.get("golden_days", 0)
-                    if golden_days:
-                        db.extend_golden(user_id, golden_days)
-
-    return {"received": True}
+@router.get("/webhook/whish")
+def whish_callback(external_id: str, result: str, request: Request) -> Response:
+    # Whish's callback is just a GET ping with no body and no signature - the
+    # docs are explicit that it's a signal, not proof of payment, so a
+    # "success" callback still gets confirmed against Get Payment Status
+    # before anything is credited. A "failure" callback needs no action at
+    # all (nothing was ever credited), but still gets a 200 either way.
+    if result == "success":
+        decoded = _decode_external_id(external_id)
+        if decoded:
+            user_id, pack_key = decoded
+            _confirm_and_credit(user_id, pack_key, external_id)
+    return Response(status_code=200)

@@ -545,7 +545,7 @@ def log_token_usage(user_id: int, endpoint: str, input_tokens: int, output_token
 
 
 def record_purchase(user_id: int, credits: int, amount_cents: int, provider_reference: str | None = None) -> bool:
-    """Logs an actual completed payment (via NOWPayments) - the real dollars
+    """Logs an actual completed payment (via Whish Pay) - the real dollars
     taken in, as opposed to `lifetime_credits_spent` which tracks credits
     redeemed (including free signup/referral credits that were never paid for).
 
@@ -630,7 +630,7 @@ def list_promo_codes() -> list[dict]:
 def get_usage_summary() -> list[dict]:
     """Per-user usage rollup for the admin dashboard: token totals (from every
     Claude API call attributable to that user, including the scope classifier),
-    lifetime credits spent, real NOWPayments revenue collected, and current
+    lifetime credits spent, real Whish Pay revenue collected, and current
     chat/advice activity."""
     with _connect() as conn:
         rows = conn.execute(

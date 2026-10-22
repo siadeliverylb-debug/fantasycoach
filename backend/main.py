@@ -641,7 +641,7 @@ class AdminUserUsage(BaseModel):
 
 # Rough blended $/credit across the three packs - only used to put a dollar figure
 # on credits redeemed that were never actually paid for (signup/referral bonuses),
-# for comparison against real API cost. Actual income uses real NOWPayments amounts
+# for comparison against real API cost. Actual income uses real Whish Pay amounts
 # (db.record_purchase), not this estimate.
 _CREDIT_USD_RATE = sum(p["amount_cents"] / 100 / p["credits"] for p in billing.CREDIT_PACKS.values()) / len(
     billing.CREDIT_PACKS
