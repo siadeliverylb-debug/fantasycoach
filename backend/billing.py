@@ -73,6 +73,26 @@ def _whish_headers() -> dict[str, str]:
     }
 
 
+RETRYABLE_CODES = {"500", "itel.unknown_error"}
+
+
+def _post_whish(path: str, payload: dict) -> dict:
+    """POSTs to Whish and returns the parsed body, retrying exactly once with
+    the identical payload (same externalId included) if the first response's
+    code is one of the documented "outcome unknown, not failed" cases - per
+    Whish's idempotency docs, resending with an unchanged externalId/body is
+    always safe (never runs the payment twice) and recovers the stored
+    result once it exists. A second occurrence of the same code means the
+    request was genuinely rejected rather than merely slow, so that one is
+    left for the caller to treat as a real failure."""
+    for attempt in range(2):
+        resp = requests.post(f"{WHISH_BASE}{path}", json=payload, headers=_whish_headers(), timeout=15)
+        body = resp.json() if resp.content else {}
+        if body.get("status") or body.get("code") not in RETRYABLE_CODES or attempt == 1:
+            return body
+    return body  # unreachable, satisfies type checkers
+
+
 def _encode_external_id(user_id: int, pack_key: str) -> str:
     """Packs user_id + pack into the externalId itself (mirrors the old
     NOWPayments order_id trick) so the GET callback - which Whish fires with
@@ -113,11 +133,10 @@ def create_checkout(req: CheckoutRequest, user: dict = Depends(get_current_user)
     }
 
     try:
-        resp = requests.post(f"{WHISH_BASE}/payment/whish", json=payload, headers=_whish_headers(), timeout=15)
+        body = _post_whish("/payment/whish", payload)
     except requests.RequestException as e:
         raise HTTPException(502, f"Could not reach Whish Pay: {e}")
 
-    body = resp.json() if resp.content else {}
     # Whish's own success/failure signal is the body's "status" field, not the
     # HTTP status code - a 200 can still carry status: false.
     if not body.get("status"):
@@ -134,13 +153,8 @@ def _confirm_and_credit(user_id: int, pack_key: str, external_id: str) -> None:
     if not pack:
         return
     try:
-        resp = requests.post(
-            f"{WHISH_BASE}/payment/collect/status",
-            json={"currency": "USD", "externalId": external_id},
-            headers=_whish_headers(),
-            timeout=15,
-        )
-        status = (resp.json().get("data") or {}).get("collectStatus")
+        body = _post_whish("/payment/collect/status", {"currency": "USD", "externalId": external_id})
+        status = (body.get("data") or {}).get("collectStatus")
     except (requests.RequestException, ValueError):
         return  # best-effort - an unconfirmed payment is simply not credited yet
 
