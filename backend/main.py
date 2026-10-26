@@ -271,16 +271,33 @@ def chat(req: ChatRequest, user: dict = Depends(auth.get_current_user)) -> ChatR
     is_advice = agent.reply_has_advice_tag(reply)
 
     if not is_admin:
+        # Every reply must use up a free slot or at least one credit - the
+        # up-front gate only guarantees one of those exists, not the one
+        # matching this reply's tier. Charging min(cost, credits) alone let a
+        # 0-credit user with the *other* tier's free slot unused chat forever,
+        # each reply billed 0. So: the matching free slot first, then the full
+        # credit price, then the other tier's free slot, then whatever credit
+        # is left - total free replies can never exceed the weekly allowance.
+        credits = db.get_credits(user["id"])
         if is_advice:
             if advice_used < free_advice_limit:
                 db.increment_advice_usage(user["id"], gameweek)
+            elif credits >= ADVICE_CREDIT_COST:
+                db.spend_credits(user["id"], ADVICE_CREDIT_COST)
+            elif chat_used < free_chat_limit:
+                db.increment_chat_count(user["id"], gameweek)
             else:
-                db.spend_credits(user["id"], min(ADVICE_CREDIT_COST, db.get_credits(user["id"])))
+                # Gate guarantees >= 1 credit here; a user down to their last
+                # credit pays that, which then blocks further turns.
+                db.spend_credits(user["id"], credits)
         else:
             if chat_used < free_chat_limit:
                 db.increment_chat_count(user["id"], gameweek)
+            elif credits >= 1:
+                db.spend_credits(user["id"], 1)
             else:
-                db.spend_credits(user["id"], min(1, db.get_credits(user["id"])))
+                # Gate guarantees the free advice slot is still unused here.
+                db.increment_advice_usage(user["id"], gameweek)
 
     return ChatResponse(reply=reply, is_advice=is_advice, credits=db.get_credits(user["id"]))
 
