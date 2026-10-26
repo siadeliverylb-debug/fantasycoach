@@ -6,11 +6,12 @@ which already handles that gracefully (skips usage logging, falls back to
 a team's live squad when there's no saved draft to look up)."""
 
 import asyncio
+import hmac
 import logging
 import os
 
 import requests
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 
 from . import agent, db, tools
 
@@ -47,6 +48,31 @@ WELCOME_MESSAGE = (
 
 def _bot_token() -> str | None:
     return os.environ.get("TELEGRAM_BOT_TOKEN")
+
+
+def _webhook_secret() -> str | None:
+    return os.environ.get("TELEGRAM_WEBHOOK_SECRET")
+
+
+def register_webhook() -> None:
+    """(Re-)registers the webhook with Telegram, including the secret_token
+    Telegram then echoes back on every delivery - called at startup so
+    setting/rotating TELEGRAM_WEBHOOK_SECRET is just a Fly secret change and
+    the bot token never has to leave the server. Best-effort: a failure here
+    leaves the previous registration in place, it never blocks startup."""
+    token, secret, base_url = _bot_token(), _webhook_secret(), os.environ.get("BASE_URL")
+    if not (token and secret and base_url):
+        return
+    try:
+        body = requests.post(
+            f"{TELEGRAM_API_BASE}/bot{token}/setWebhook",
+            json={"url": f"{base_url}/api/telegram/webhook", "secret_token": secret},
+            timeout=10,
+        ).json()
+        if not body.get("ok"):
+            logger.error("Telegram setWebhook failed: %s", body.get("description"))
+    except (requests.RequestException, ValueError):
+        logger.exception("Telegram setWebhook failed")
 
 
 def _send_message(chat_id: int, text: str) -> None:
@@ -115,6 +141,15 @@ def _handle_message(chat_id: int, text: str) -> None:
 
 @router.post("/webhook")
 async def telegram_webhook(request: Request) -> dict:
+    # Without this anyone could POST fake updates straight to this URL - each
+    # one a paid agent.chat() call, and a made-up chat_id per request dodges
+    # the per-chat free limit entirely. Only enforced once the secret is set
+    # (register_webhook hands the same value to Telegram at startup).
+    secret = _webhook_secret()
+    received = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
+    if secret and not hmac.compare_digest(received, secret):
+        raise HTTPException(403)
+
     update = await request.json()
     message = update.get("message") or {}
     chat = message.get("chat") or {}

@@ -133,6 +133,24 @@ async def _issue_visitor_cookie(request, call_next):
     return response
 
 
+# No Content-Security-Policy yet - the pages rely on inline scripts/styles,
+# so a useful CSP needs those moved out first.
+_SECURITY_HEADERS = {
+    "Strict-Transport-Security": "max-age=31536000",
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+}
+
+
+@app.middleware("http")
+async def _add_security_headers(request, call_next):
+    response = await call_next(request)
+    for name, value in _SECURITY_HEADERS.items():
+        response.headers.setdefault(name, value)
+    return response
+
+
 class VisitBeacon(BaseModel):
     path: str
 
@@ -178,6 +196,7 @@ if _reset_spec and ":" in _reset_spec:
 app.include_router(auth.router)
 app.include_router(billing.router)
 app.include_router(telegram_bot.router)
+telegram_bot.register_webhook()
 
 FREE_CHAT_MESSAGES_PER_GAMEWEEK = 3
 FREE_ADVICE_USES_PER_GAMEWEEK = 1
@@ -879,7 +898,9 @@ def captain_picks_page() -> HTMLResponse:
     except Exception:
         # Best-effort public content page - if generation fails, still show a
         # usable page pointing people at the real (logged-in) chat instead of
-        # a bare error.
+        # a bare error. Still logged - silently swallowing this is how an
+        # empty Anthropic credit balance went unnoticed (2026-10-26).
+        logger.exception("Captain picks generation failed for GW%s", gameweek)
         content = {"intro": "", "picks": []}
 
     intro = html.escape(content.get("intro") or "")
@@ -1002,6 +1023,7 @@ def differentials_page() -> HTMLResponse:
     try:
         content = _get_differentials_cached(gameweek)
     except Exception:
+        logger.exception("Differentials generation failed for GW%s", gameweek)
         content = {"intro": "", "picks": []}
 
     intro = html.escape(content.get("intro") or "")
