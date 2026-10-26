@@ -1097,6 +1097,29 @@ def differentials_page() -> HTMLResponse:
     return HTMLResponse(html_out)
 
 
+# The same cached content as /captain-picks and /differentials, as JSON - read
+# by the fpl-social-agent bot so it can post SIA's picks to X/Instagram before
+# each deadline instead of only ever living on these pages.
+@app.get("/api/public/captain-picks")
+def captain_picks_json() -> dict:
+    gameweek = _current_gameweek()
+    try:
+        content = _get_captain_picks_cached(gameweek)
+    except Exception:
+        raise HTTPException(503, "Captain picks aren't available right now.")
+    return {"gameweek": gameweek, **content}
+
+
+@app.get("/api/public/differentials")
+def differentials_json() -> dict:
+    gameweek = _current_gameweek()
+    try:
+        content = _get_differentials_cached(gameweek)
+    except Exception:
+        raise HTTPException(503, "Differentials aren't available right now.")
+    return {"gameweek": gameweek, **content}
+
+
 @app.get("/")
 def index() -> HTMLResponse:
     return _render_page("index.html", "style.css", "app.js", "logo.jpg", "favicon.png")
