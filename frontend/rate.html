@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" type="image/png" href="/static/favicon.png" />
+  <title>FPL Rate My Team - Free AI Team Rating | Fantasy Coach</title>
+  <meta name="description" content="Get your Fantasy Premier League team rated out of 10 by AI in seconds - free, no signup. Strengths, weaknesses, the best transfer and a captain pick for this gameweek." />
+  <link rel="canonical" href="https://fantasycoach.org/rate-my-team" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Fantasy Coach" />
+  <meta property="og:title" content="FPL Rate My Team - free AI rating out of 10" />
+  <meta property="og:description" content="Enter your FPL team ID and SIA rates your squad, spots its weak spots and picks your transfer and captain. Free, no signup." />
+  <meta property="og:url" content="https://fantasycoach.org/rate-my-team" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="FPL Rate My Team - free AI rating out of 10" />
+  <meta name="twitter:description" content="SIA rates your FPL squad out of 10 and picks your transfer and captain. Free, no signup." />
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div class="pricing-page rate-page">
+    <a href="/" class="pricing-back-link">← Back to Fantasy Coach</a>
+    <header class="pricing-header">
+      <img src="/static/logo.jpg" alt="Fantasy Coach" class="site-logo" />
+      <h1>Rate My FPL Team</h1>
+      <p class="subtitle">SIA rates your squad out of 10, then picks your best transfer and captain. Free, no signup.</p>
+    </header>
+
+    <section class="legal-section">
+      <form id="rate-form" class="rate-form">
+        <label for="rate-team-id">Your FPL team ID</label>
+        <div class="rate-form-row">
+          <input id="rate-team-id" type="text" inputmode="numeric" placeholder="e.g. 1234567" autocomplete="off" maxlength="10" />
+          <button type="submit" id="rate-submit">Rate my team</button>
+        </div>
+      </form>
+      <details class="rate-help">
+        <summary>Where do I find my team ID?</summary>
+        <ol>
+          <li>Log into <a href="https://fantasy.premierleague.com/" target="_blank" rel="noopener">fantasy.premierleague.com</a> and open "Points".</li>
+          <li>The page's URL ends in something like <code>/entry/1234567/event/9</code>.</li>
+          <li>That number (<code>1234567</code>) is your team ID.</li>
+        </ol>
+      </details>
+      <p id="rate-status" class="rate-status" hidden></p>
+    </section>
+
+    <section id="rate-result" class="legal-section rate-result" hidden>
+      <div class="rate-score-row">
+        <div class="rate-score"><span id="rate-score"></span><small>/10</small></div>
+        <div>
+          <div id="rate-team-name" class="rate-team-name"></div>
+          <p id="rate-headline" class="rate-headline"></p>
+        </div>
+      </div>
+      <h2>✅ Strengths</h2>
+      <ul id="rate-strengths" class="pricing-free-list"></ul>
+      <h2>⚠️ Weaknesses</h2>
+      <ul id="rate-weaknesses" class="pricing-free-list"></ul>
+      <h2>🔁 Best transfer</h2>
+      <p id="rate-transfer"></p>
+      <h2>👑 Captain pick</h2>
+      <p id="rate-captain"></p>
+
+      <div class="rate-share">
+        <span>Share your rating:</span>
+        <a id="share-x" class="credit-btn" target="_blank" rel="noopener">Post on X</a>
+        <a id="share-whatsapp" class="credit-btn" target="_blank" rel="noopener">WhatsApp</a>
+        <button type="button" id="share-copy" class="credit-btn">Copy link</button>
+      </div>
+
+      <p class="pricing-upgrade">
+        <strong>Want SIA to fix it?</strong> Sign up free and chat with SIA about your squad every
+        gameweek - transfers, captaincy, chips and more.
+      </p>
+      <a href="/" class="pricing-cta">Sign up free</a>
+    </section>
+
+    <p class="disclaimer pricing-disclaimer">
+      Fantasy Coach is an independent tool, not affiliated with or endorsed by the Premier League
+      or Fantasy Premier League. Ratings are AI-generated from public FPL data and may be wrong.
+      <a href="/privacy">Privacy policy</a>
+    </p>
+  </div>
+
+  <script>
+    const form = document.getElementById("rate-form");
+    const input = document.getElementById("rate-team-id");
+    const submitBtn = document.getElementById("rate-submit");
+    const statusEl = document.getElementById("rate-status");
+    const resultEl = document.getElementById("rate-result");
+
+    function setStatus(text) {
+      statusEl.textContent = text;
+      statusEl.hidden = !text;
+    }
+
+    function fillList(id, items) {
+      const ul = document.getElementById(id);
+      ul.innerHTML = "";
+      (items || []).forEach((text) => {
+        const li = document.createElement("li");
+        li.textContent = text;
+        ul.appendChild(li);
+      });
+    }
+
+    function render(r) {
+      document.getElementById("rate-score").textContent = r.score;
+      document.getElementById("rate-team-name").textContent = r.team_name || `Team ${r.team_id}`;
+      document.getElementById("rate-headline").textContent = r.headline;
+      fillList("rate-strengths", r.strengths);
+      fillList("rate-weaknesses", r.weaknesses);
+      document.getElementById("rate-transfer").textContent = r.transfer_tip;
+      document.getElementById("rate-captain").textContent = r.captain_pick;
+
+      const shareUrl = `${location.origin}/rate-my-team?team=${r.team_id}`;
+      const shareText = `SIA rated my FPL team ${r.score}/10 for GW${r.gameweek} 🤖⚽ Rate yours free:`;
+      document.getElementById("share-x").href =
+        `https://x.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`;
+      document.getElementById("share-whatsapp").href =
+        `https://wa.me/?text=${encodeURIComponent(`${shareText} ${shareUrl}`)}`;
+      document.getElementById("share-copy").onclick = async (e) => {
+        try {
+          await navigator.clipboard.writeText(shareUrl);
+          e.target.textContent = "Link copied!";
+        } catch {
+          e.target.textContent = shareUrl;
+        }
+      };
+      resultEl.hidden = false;
+      resultEl.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    async function rate(teamId) {
+      setStatus("SIA is looking at your squad... this takes about 10-20 seconds.");
+      resultEl.hidden = true;
+      submitBtn.disabled = true;
+      try {
+        const resp = await fetch("/api/rate-team", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ team_id: teamId }),
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok) {
+          setStatus(data.detail || "Something went wrong - please try again.");
+          return;
+        }
+        setStatus("");
+        render(data);
+        history.replaceState(null, "", `/rate-my-team?team=${data.team_id}`);
+      } catch {
+        setStatus("Couldn't reach Fantasy Coach - check your connection and try again.");
+      } finally {
+        submitBtn.disabled = false;
+      }
+    }
+
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const teamId = input.value.trim();
+      if (!/^\d+$/.test(teamId)) {
+        setStatus("Enter your numeric FPL team ID (see below for where to find it).");
+        return;
+      }
+      rate(teamId);
+    });
+
+    // A shared link (/rate-my-team?team=123) shows that team's rating straight away.
+    const sharedTeam = new URLSearchParams(location.search).get("team");
+    if (sharedTeam && /^\d+$/.test(sharedTeam)) {
+      input.value = sharedTeam;
+      rate(sharedTeam);
+    }
+
+    // Only counts as a visit once this actually runs in a real browser - see
+    // /api/visit on the backend for why (filters out scrapers/bots that fetch
+    // the raw HTML with a spoofed browser User-Agent but never execute JS).
+    fetch("/api/visit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: "/rate-my-team" }),
+      keepalive: true,
+    }).catch(() => {});
+  </script>
+</body>
+</html>

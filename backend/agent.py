@@ -491,6 +491,59 @@ def get_draft_advice_structured(
         return json.loads(text)
 
 
+RATE_TEAM_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "score": {"type": "integer", "description": "overall squad rating from 1 (poor) to 10 (excellent)"},
+        "headline": {"type": "string", "description": "one punchy sentence summing up the squad, under 20 words"},
+        "strengths": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "2-3 strengths, each one sentence naming specific players and a concrete stat",
+        },
+        "weaknesses": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "2-3 weaknesses, each one sentence naming specific players and a concrete stat",
+        },
+        "transfer_tip": {
+            "type": "string",
+            "description": "the single best transfer for the upcoming gameweek: who out, who in, and why, in 1-2 sentences",
+        },
+        "captain_pick": {"type": "string", "description": "who to captain this gameweek and why, in one sentence"},
+    },
+    "required": ["score", "headline", "strengths", "weaknesses", "transfer_tip", "captain_pick"],
+    "additionalProperties": False,
+}
+
+RATE_TEAM_SYSTEM = """You are SIA, Fantasy Coach's FPL (Fantasy Premier League) \
+assistant, rating a manager's squad for the public "Rate My Team" tool. Be honest \
+and specific: base every point on the stats given (form, points, xGI, fixtures, \
+injury news, price) and name the players involved. Use the whole 1-10 scale - an \
+average squad is a 5 or 6, and a 9 or 10 is rare. Keep the tone friendly and \
+encouraging, like a knowledgeable mate, and only suggest a transfer the manager \
+can afford with the money in the bank plus the outgoing player's price."""
+
+
+def rate_team(squad_summary: str) -> dict:
+    """One-shot squad rating for the anonymous /rate-my-team tool - no tool
+    loop (the caller passes all the stats it needs), and always FREE_MODEL,
+    since it's open to anyone without an account."""
+    response = _get_client().messages.create(
+        model=FREE_MODEL,
+        max_tokens=MAX_TOKENS,
+        system=RATE_TEAM_SYSTEM,
+        messages=[{"role": "user", "content": f"Rate my FPL squad:\n\n{squad_summary}"}],
+        output_config={"format": {"type": "json_schema", "schema": RATE_TEAM_SCHEMA}},
+    )
+    if response.stop_reason != "end_turn":
+        raise RuntimeError(f"rate_team stopped with {response.stop_reason}")
+    text = next((b.text for b in response.content if b.type == "text"), "{}")
+    result = json.loads(text)
+    result["score"] = max(1, min(10, int(result.get("score", 5))))
+    return result
+
+
 CAPTAIN_PICKS_SCHEMA = {
     "type": "object",
     "properties": {

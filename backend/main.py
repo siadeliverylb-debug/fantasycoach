@@ -48,7 +48,7 @@ def _require_not_in_maintenance() -> None:
     if _maintenance_mode:
         raise HTTPException(503, "Fantasy Coach is being updated - please try again in a moment.")
 
-_TRACKED_PAGE_PATHS = {"/", "/pricing"}
+_TRACKED_PAGE_PATHS = {"/", "/pricing", "/rate-my-team"}
 
 
 def _get_client_ip(request) -> str | None:
@@ -368,6 +368,104 @@ def try_sia(req: TryRequest, request: Request) -> TryResponse:
         logger.exception("agent.chat() failed for anonymous try")
         raise HTTPException(503, "SIA is temporarily unavailable - please try again in a moment.")
     return TryResponse(reply=agent.strip_player_tags(reply))
+
+
+# Public "Rate My Team" tool - no account needed, so it's a top-of-funnel hook
+# that anyone can share. Ratings are cached per team and gameweek, so a shared
+# link (/rate-my-team?team=123) is served from cache and never costs another
+# model call - only fresh ratings count against these limits.
+RATE_PER_IP_PER_DAY = 3
+RATE_GLOBAL_PER_DAY = 300
+_RATE_CACHE_MAX = 5000
+_rating_cache: dict[tuple[int, int], dict] = {}
+
+
+class RateTeamRequest(BaseModel):
+    team_id: str
+
+
+class RateTeamResponse(BaseModel):
+    team_id: int
+    team_name: str | None
+    gameweek: int
+    score: int
+    headline: str
+    strengths: list[str]
+    weaknesses: list[str]
+    transfer_tip: str
+    captain_pick: str
+
+
+def _rate_team_summary(squad_data: dict) -> str:
+    stats = tools.get_players_stats([p["element"] for p in squad_data["squad"]])
+    lines = [f"Gameweek {squad_data['gameweek']} squad:"]
+    for p in squad_data["squad"]:
+        s = stats.get(p["element"], {})
+        role = " (C)" if p["is_captain"] else " (VC)" if p["is_vice_captain"] else ""
+        slot = "BENCH " if p["multiplier"] == 0 else ""
+        xgi = (float(s.get("expected_goals") or 0) + float(s.get("expected_assists") or 0))
+        line = (
+            f"- {slot}{p['name']}{role} ({p['position']}, {p['team_short']}) £{p['price_m']}m | "
+            f"form {s.get('form')}, {s.get('total_points')} pts, xGI {xgi:.2f}, "
+            f"owned {s.get('selected_by_percent')}% | next: {p.get('next_fixture') or 'no fixture'}"
+        )
+        if p.get("status") != "a":
+            line += f" | {p.get('news') or 'not fully fit'}"
+        lines.append(line)
+    chips_left = [c["name"] for c in squad_data.get("chips", []) if not c["used"]]
+    lines.append(f"Bank: £{squad_data['bank_m']}m | Free transfers: {squad_data.get('free_transfers')}")
+    lines.append(f"Chips still available: {', '.join(chips_left) or 'none'}")
+    lines.append(f"Overall rank: {squad_data.get('overall_rank')}")
+    return "\n".join(lines)
+
+
+@app.post("/api/rate-team", response_model=RateTeamResponse)
+def rate_team(req: RateTeamRequest, request: Request) -> RateTeamResponse:
+    _require_not_in_maintenance()
+    team_id_str = req.team_id.strip()
+    if not team_id_str.isdigit() or len(team_id_str) > 10:
+        raise HTTPException(400, "Enter your numeric FPL team ID.")
+    if _is_bot_request(request):
+        raise HTTPException(403, "Not available.")
+    team_id = int(team_id_str)
+    gameweek = _current_gameweek()
+
+    cached = _rating_cache.get((team_id, gameweek))
+    if cached:
+        return RateTeamResponse(**cached)
+
+    squad_data = tools.get_next_gameweek_squad(team_id)
+    if "error" in squad_data:
+        raise HTTPException(404, "Couldn't find that FPL team - check the team ID and try again.")
+
+    day = time.strftime("%Y-%m-%d", time.gmtime())
+    # Same try_usage table as /api/try, under its own day key so the two
+    # tools' allowances stay separate.
+    rate_day = f"rate:{day}"
+    ip_hash = hashlib.sha256(f"{day}:{_get_client_ip(request) or 'unknown'}".encode()).hexdigest()
+    outcome = db.try_reserve(rate_day, ip_hash, RATE_PER_IP_PER_DAY, RATE_GLOBAL_PER_DAY)
+    if outcome == "ip":
+        raise HTTPException(429, "You've rated 3 teams today - sign up free to ask SIA anything about your squad.")
+    if outcome == "global":
+        raise HTTPException(429, "Today's free ratings are all used up - sign up free to ask SIA about your squad now.")
+
+    try:
+        rating = agent.rate_team(_rate_team_summary(squad_data))
+    except Exception:
+        db.try_release(rate_day, ip_hash)
+        logger.exception("agent.rate_team() failed for team_id=%s", team_id)
+        raise HTTPException(503, "SIA is temporarily unavailable - please try again in a moment.")
+
+    result = {
+        "team_id": team_id,
+        "team_name": squad_data.get("team_name"),
+        "gameweek": gameweek,
+        **{k: rating[k] for k in ("score", "headline", "strengths", "weaknesses", "transfer_tip", "captain_pick")},
+    }
+    if len(_rating_cache) >= _RATE_CACHE_MAX:
+        _rating_cache.clear()
+    _rating_cache[(team_id, gameweek)] = result
+    return RateTeamResponse(**result)
 
 
 @app.get("/api/gameweek")
@@ -985,6 +1083,7 @@ def captain_picks_page() -> HTMLResponse:
     </div>
 
     <p class="content-crosslink"><a href="/differentials">→ This gameweek's differential picks (under 10% owned)</a></p>
+    <p class="content-crosslink"><a href="/rate-my-team">→ Rate your own FPL team out of 10 - free, no signup</a></p>
     <a href="/" class="pricing-cta">Get personalized advice for your own squad - free →</a>
 
     <p class="disclaimer pricing-disclaimer">
@@ -1108,6 +1207,7 @@ def differentials_page() -> HTMLResponse:
     </div>
 
     <p class="content-crosslink"><a href="/captain-picks">→ This gameweek's top captain picks</a></p>
+    <p class="content-crosslink"><a href="/rate-my-team">→ Rate your own FPL team out of 10 - free, no signup</a></p>
     <a href="/" class="pricing-cta">Get personalized advice for your own squad - free →</a>
 
     <p class="disclaimer pricing-disclaimer">
@@ -1160,6 +1260,11 @@ def pricing() -> HTMLResponse:
 @app.get("/privacy")
 def privacy() -> HTMLResponse:
     return _render_page("privacy.html", "style.css", "logo.jpg", "favicon.png")
+
+
+@app.get("/rate-my-team")
+def rate_my_team_page() -> HTMLResponse:
+    return _render_page("rate.html", "style.css", "logo.jpg", "favicon.png")
 
 
 @app.get("/admin")

@@ -284,6 +284,17 @@ def get_players_status(element_ids: list[int]) -> dict[int, str]:
     }
 
 
+def get_players_stats(element_ids: list[int]) -> dict[int, dict]:
+    """Full serialized stats (form, points, xG, ...) for each given FPL element
+    id - same bootstrap cache as get_players_status, so no extra API cost."""
+    players_by_id = {p["id"]: p for p in fpl.get_bootstrap()["elements"]}
+    return {
+        element_id: _serialize_player(players_by_id[element_id])
+        for element_id in element_ids
+        if element_id in players_by_id
+    }
+
+
 CHIP_NAMES = {
     "wildcard": "Wildcard",
     "freehit": "Free Hit",

@@ -1688,6 +1688,108 @@ header .disclaimer {
   line-height: 1.6;
 }
 
+.rate-form label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.rate-form-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.rate-form-row input {
+  flex: 1 1 180px;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.rate-form-row button {
+  flex: 0 0 auto;
+  padding: 12px 20px;
+  border: none;
+  border-radius: 8px;
+  background: var(--accent-2);
+  color: #06210f;
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.rate-form-row button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.rate-help {
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.rate-help summary {
+  cursor: pointer;
+}
+
+.rate-status {
+  margin: 12px 0 0;
+  color: var(--accent-2);
+}
+
+.rate-score-row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 16px;
+}
+
+.rate-score {
+  flex: 0 0 auto;
+  font-size: 3rem;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--accent-2);
+}
+
+.rate-score small {
+  font-size: 1.1rem;
+  color: var(--muted);
+}
+
+.rate-team-name {
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.rate-headline {
+  margin: 4px 0 0;
+  line-height: 1.5;
+}
+
+.rate-result h2 {
+  margin-top: 18px;
+}
+
+.rate-share {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 20px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.rate-share a {
+  text-decoration: none;
+}
+
 .pricing-upgrade {
   margin: 14px 0 0;
   padding: 10px 12px;
