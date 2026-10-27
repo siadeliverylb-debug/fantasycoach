@@ -96,21 +96,45 @@ header h1 {
   color: #06210f;
 }
 
-.site-footer-disclaimer {
-  margin: 24px auto 12px;
-  padding: 8px 10px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--border);
-  color: var(--muted);
-  font-size: 0.72rem;
-  line-height: 1.4;
+.site-footer {
+  max-width: 720px;
+  margin: 28px auto 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
   text-align: center;
-  max-width: 640px;
 }
 
-.site-footer-disclaimer a {
+.site-footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0 18px;
+}
+
+.site-footer-links a {
+  padding: 10px 2px;
   color: var(--accent-2);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.site-footer-links a:hover {
+  text-decoration: underline;
+}
+
+.site-footer-disclaimer {
+  max-width: 640px;
+  margin: 6px auto;
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.site-footer-copy {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 0.72rem;
 }
 
 .site-logo {
