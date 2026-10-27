@@ -12,9 +12,11 @@ from pathlib import Path
 import requests
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, PlainTextResponse, Response
+from fastapi.exception_handlers import http_exception_handler
+from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.sessions import SessionMiddleware
 
 load_dotenv()
@@ -149,6 +151,56 @@ async def _add_security_headers(request, call_next):
     for name, value in _SECURITY_HEADERS.items():
         response.headers.setdefault(name, value)
     return response
+
+
+@app.middleware("http")
+async def _cache_static_files(request, call_next):
+    response = await call_next(request)
+    if request.url.path.startswith("/static/") and response.status_code == 200:
+        # _render_page stamps ?v=<content hash> on the assets it links, so a
+        # versioned URL never changes content - safe to cache for a year.
+        # Anything fetched without one gets an hour.
+        response.headers["Cache-Control"] = (
+            "public, max-age=31536000, immutable" if "v" in request.query_params else "public, max-age=3600"
+        )
+    return response
+
+
+@app.middleware("http")
+async def _redirect_www(request, call_next):
+    # www.fantasycoach.org otherwise serves a full duplicate of the site, which
+    # search engines treat as duplicate content - send it to the bare domain.
+    host = request.headers.get("host", "")
+    if host.startswith("www."):
+        return RedirectResponse(str(request.url.replace(scheme="https", netloc=host[4:])), status_code=301)
+    return await call_next(request)
+
+
+@app.middleware("http")
+async def _answer_head_as_get(request, call_next):
+    # FastAPI's GET-only routes answer HEAD with a 405, which uptime monitors
+    # and some link-preview crawlers send - run it as the GET and drop the body
+    # (the server itself never sends a body for HEAD).
+    if request.method != "HEAD":
+        return await call_next(request)
+    request.scope["method"] = "GET"
+    response = await call_next(request)
+    async for _ in response.body_iterator:
+        pass
+    head_response = Response(status_code=response.status_code)
+    head_response.raw_headers = response.raw_headers
+    return head_response
+
+
+@app.exception_handler(StarletteHTTPException)
+async def _not_found_page(request, exc):
+    # A missing page gets a real page with links back into the site instead of
+    # FastAPI's bare {"detail": "Not Found"} - API callers keep the JSON.
+    if exc.status_code == 404 and not request.url.path.startswith("/api/"):
+        response = _render_page("404.html", "style.css", "logo.jpg", "favicon.png")
+        response.status_code = 404
+        return response
+    return await http_exception_handler(request, exc)
 
 
 class VisitBeacon(BaseModel):
@@ -1044,7 +1096,11 @@ def captain_picks_page() -> HTMLResponse:
   <meta property="og:title" content="{html.escape(page_title)}" />
   <meta property="og:description" content="{html.escape(page_description)}" />
   <meta property="og:url" content="https://fantasycoach.org/captain-picks" />
-  <meta name="twitter:card" content="summary" />
+  <meta property="og:image" content="https://fantasycoach.org/static/og-image.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:image" content="https://fantasycoach.org/static/og-image.png" />
   <meta name="twitter:title" content="{html.escape(page_title)}" />
   <meta name="twitter:description" content="{html.escape(page_description)}" />
   <link rel="stylesheet" href="/static/style.css?v={_asset_version("style.css")}" />
@@ -1168,7 +1224,11 @@ def differentials_page() -> HTMLResponse:
   <meta property="og:title" content="{html.escape(page_title)}" />
   <meta property="og:description" content="{html.escape(page_description)}" />
   <meta property="og:url" content="https://fantasycoach.org/differentials" />
-  <meta name="twitter:card" content="summary" />
+  <meta property="og:image" content="https://fantasycoach.org/static/og-image.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:image" content="https://fantasycoach.org/static/og-image.png" />
   <meta name="twitter:title" content="{html.escape(page_title)}" />
   <meta name="twitter:description" content="{html.escape(page_description)}" />
   <link rel="stylesheet" href="/static/style.css?v={_asset_version("style.css")}" />

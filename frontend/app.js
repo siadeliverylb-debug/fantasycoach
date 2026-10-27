@@ -3,7 +3,7 @@ const prefillTeamId = new URLSearchParams(location.search).get("team_id");
 
 const authSectionEl = document.getElementById("auth-section");
 const appSectionEl = document.getElementById("app-section");
-const landingOnlyEls = document.querySelectorAll(".landing-example, .landing-try, .header-captain-picks-banner");
+const landingOnlyEls = document.querySelectorAll(".landing-example, .landing-try, .landing-hero, .header-captain-picks-banner");
 const tabLoginEl = document.getElementById("tab-login");
 const tabSignupEl = document.getElementById("tab-signup");
 const authFormEl = document.getElementById("auth-form");
@@ -61,6 +61,8 @@ const benchEl = document.getElementById("bench");
 const gameweekBarEl = document.getElementById("gameweek-bar");
 const newsFeedEl = document.getElementById("news-feed");
 const newsFeedListEl = document.getElementById("news-feed-list");
+const newsFeedMoreEl = document.getElementById("news-feed-more");
+const NEWS_PREVIEW_COUNT = 6;
 const colorModeSelectEl = document.getElementById("color-mode-select");
 const squadViewToggleEl = document.getElementById("squad-view-toggle");
 const squadViewLiveBtnEl = document.getElementById("squad-view-live-btn");
@@ -1840,9 +1842,17 @@ async function loadNewsFeed() {
       return;
     }
     newsFeedListEl.innerHTML = "";
-    for (const item of items) {
+    // Show the latest few with a "Show all" toggle instead of a fixed-height
+    // scroll box - a nested scroller swallowed mouse-wheel scrolling of the
+    // whole page whenever the pointer passed over it.
+    const extraRows = [];
+    for (const [i, item] of items.entries()) {
       const row = document.createElement("div");
       row.className = "news-feed-item";
+      if (i >= NEWS_PREVIEW_COUNT) {
+        row.hidden = true;
+        extraRows.push(row);
+      }
 
       const icon = document.createElement("span");
       icon.className = "news-feed-icon";
@@ -1868,6 +1878,13 @@ async function loadNewsFeed() {
 
       newsFeedListEl.appendChild(row);
     }
+    newsFeedMoreEl.hidden = extraRows.length === 0;
+    newsFeedMoreEl.textContent = `Show all ${items.length} updates`;
+    newsFeedMoreEl.onclick = () => {
+      const expanding = extraRows[0].hidden;
+      extraRows.forEach((row) => { row.hidden = !expanding; });
+      newsFeedMoreEl.textContent = expanding ? "Show fewer" : `Show all ${items.length} updates`;
+    };
     newsFeedEl.hidden = false;
   } catch {
     // best-effort widget - leave whatever was last rendered (or stay hidden)

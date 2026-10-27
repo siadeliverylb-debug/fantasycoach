@@ -12,17 +12,46 @@
   <meta property="og:title" content="Fantasy Coach - AI Fantasy Premier League Advice" />
   <meta property="og:description" content="Ask SIA about players, fixtures, transfers, captaincy, or your team/league rank - personalized FPL advice powered by AI." />
   <meta property="og:url" content="https://fantasycoach.org/" />
-  <meta name="twitter:card" content="summary" />
+  <meta property="og:image" content="https://fantasycoach.org/static/og-image.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:image" content="https://fantasycoach.org/static/og-image.png" />
   <meta name="twitter:title" content="Fantasy Coach - AI Fantasy Premier League Advice" />
   <meta name="twitter:description" content="Personalized Fantasy Premier League advice powered by AI - captaincy, transfers, chip strategy, and squad analysis." />
   <link rel="stylesheet" href="/static/style.css" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "Fantasy Coach",
+    "alternateName": "SIA - AI FPL Coach",
+    "url": "https://fantasycoach.org/",
+    "description": "AI coach for Fantasy Premier League: personalized captain picks, transfer advice, chip strategy and squad analysis for your own FPL team.",
+    "applicationCategory": "SportsApplication",
+    "operatingSystem": "Web",
+    "image": "https://fantasycoach.org/static/og-image.png",
+    "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}
+  }
+  </script>
 </head>
 <body>
   <div class="app">
     <header>
       <img src="/static/logo.jpg" alt="Fantasy Coach" class="site-logo" />
-      <h1>Fantasy Coach</h1>
+      <h1>Fantasy Coach <span class="h1-tagline">AI FPL Coach</span></h1>
       <p class="subtitle">Ask SIA about players, fixtures, transfers, or your team/league rank.</p>
+      <div class="landing-hero">
+        <p class="landing-hero-title">Your free AI coach for Fantasy Premier League</p>
+        <p class="landing-hero-text">
+          SIA looks at your actual FPL squad and tells you who to captain, who to transfer and when to
+          play your chips - backed by live stats.
+        </p>
+        <div class="landing-hero-actions">
+          <a href="/rate-my-team" class="landing-hero-btn landing-hero-btn-primary">⭐ Rate my team free</a>
+          <a href="#auth-section" class="landing-hero-btn">Sign up free</a>
+        </div>
+      </div>
       <a href="https://www.instagram.com/fantasy.coach.ai/" target="_blank" rel="noopener" class="social-link">
         <svg class="social-link-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
@@ -43,22 +72,23 @@
         </svg>
         Join our Telegram
       </a>
-      <p class="disclaimer">
-        Independent tool, not affiliated with the Premier League or FPL. Advice is AI-generated, may be
-        wrong, and is informational only - you make your own decisions; this site accepts no
-        responsibility for any outcome. <a href="/privacy">Privacy policy</a>
-      </p>
       <a href="/captain-picks" class="header-captain-picks-banner">
         <span class="header-captain-picks-icon">🏆</span>
         <span>See this gameweek's top captain picks</span>
         <span class="header-captain-picks-arrow">→</span>
       </a>
-      <a href="/rate-my-team" class="header-captain-picks-banner">
-        <span class="header-captain-picks-icon">⭐</span>
-        <span>Rate my FPL team out of 10 - free, no signup</span>
-        <span class="header-captain-picks-arrow">→</span>
-      </a>
     </header>
+
+    <div class="landing-try">
+      <div class="landing-try-title">Try SIA now - no sign-up needed</div>
+      <form id="try-form" class="landing-try-form">
+        <input id="try-input" type="text" maxlength="300" autocomplete="off" required
+               placeholder="e.g. Who's the best captain this gameweek?" />
+        <button type="submit" id="try-submit">Ask</button>
+      </form>
+      <div id="try-reply" class="msg assistant landing-try-reply" hidden></div>
+      <p id="try-note" class="landing-example-note">One free question a day, no account needed.</p>
+    </div>
 
     <div id="auth-section" class="auth-section">
       <div class="auth-tabs">
@@ -99,22 +129,12 @@
       <p id="auth-error" class="auth-error"></p>
     </div>
 
-    <div class="landing-try">
-      <div class="landing-try-title">Try SIA now - no sign-up needed</div>
-      <form id="try-form" class="landing-try-form">
-        <input id="try-input" type="text" maxlength="300" autocomplete="off" required
-               placeholder="e.g. Who's the best captain this gameweek?" />
-        <button type="submit" id="try-submit">Ask</button>
-      </form>
-      <div id="try-reply" class="msg assistant landing-try-reply" hidden></div>
-      <p id="try-note" class="landing-example-note">One free question a day, no account needed.</p>
-    </div>
-
     <div id="gameweek-bar" class="gameweek-bar"></div>
 
     <div id="news-feed" class="news-feed" hidden>
       <div class="news-feed-title">📰 Latest FPL news</div>
       <div id="news-feed-list" class="news-feed-list"></div>
+      <button type="button" id="news-feed-more" class="news-feed-more" hidden></button>
     </div>
 
     <div class="landing-value-prop">
@@ -302,6 +322,12 @@
         </div>
       </div>
     </div>
+
+    <p class="disclaimer site-footer-disclaimer">
+      Independent tool, not affiliated with the Premier League or FPL. Advice is AI-generated, may be
+      wrong, and is informational only - you make your own decisions; this site accepts no
+      responsibility for any outcome. <a href="/privacy">Privacy policy</a>
+    </p>
   </div>
 
   <div id="points-breakdown-popover" class="points-breakdown-popover" hidden>
