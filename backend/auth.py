@@ -67,7 +67,10 @@ def signup(req: SignupRequest, request: Request) -> MeResponse:
             raise HTTPException(409, "This FPL team ID is already registered to another account.")
         raise HTTPException(409, "An account with that email already exists.")
     request.session["user_id"] = user_id
-    return _me_response(db.get_user(user_id))
+    user = db.get_user(user_id)
+    if not user["is_admin"]:
+        _log_funnel(request, "signup_success", "with team ID" if team_id else "without team ID")
+    return _me_response(user)
 
 
 @router.post("/login")
@@ -106,7 +109,22 @@ def link_team(req: LinkTeamRequest, request: Request) -> MeResponse:
         db.set_team_id(user["id"], team_id)
     except ValueError:
         raise HTTPException(409, "This FPL team ID is already registered to another account.")
+    if not user.get("is_admin"):
+        _log_funnel(request, "team_linked")
     return _me_response(db.get_user(user["id"]))
+
+
+def _log_funnel(request: Request, event: str, detail: str | None = None) -> None:
+    """Server-side funnel step for the admin sign-up stats - keyed by the same
+    anonymous visitor_id cookie as page views. Never allowed to break the
+    request it's recording."""
+    visitor_id = request.cookies.get("visitor_id")
+    if not visitor_id:
+        return
+    try:
+        db.log_funnel_event(visitor_id, event, detail)
+    except Exception:
+        pass
 
 
 def get_current_user(request: Request) -> dict:

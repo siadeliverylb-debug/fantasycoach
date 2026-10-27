@@ -5,6 +5,8 @@ const countryFilterEl = document.getElementById("visitors-country-filter");
 const countryTableBodyEl = document.getElementById("visitors-country-table-body");
 const dayTableBodyEl = document.getElementById("visitors-day-table-body");
 const pathTableBodyEl = document.getElementById("visitors-path-table-body");
+const funnelTableBodyEl = document.getElementById("visitors-funnel-table-body");
+const errorsTableBodyEl = document.getElementById("visitors-errors-table-body");
 const clearMyVisitsBtnEl = document.getElementById("clear-my-visits-btn");
 const clearMyVisitsStatusEl = document.getElementById("clear-my-visits-status");
 
@@ -70,6 +72,17 @@ async function loadVisitorStats() {
   );
 
   fillTable(countryTableBodyEl, data.by_country, (r) => [r.country, String(r.visits), String(r.unique_visitors)]);
+  const landed = data.funnel.steps[0].visitors;
+  fillTable(funnelTableBodyEl, data.funnel.steps, (r) => [
+    r.label,
+    String(r.visitors),
+    landed ? `${((r.visitors / landed) * 100).toFixed(1)}%` : "-",
+  ]);
+  fillTable(
+    errorsTableBodyEl,
+    data.funnel.signup_errors.length ? data.funnel.signup_errors : [{ error: "No sign-up errors yet", times: "", visitors: "" }],
+    (r) => [r.error, String(r.times), String(r.visitors)]
+  );
   fillTable(dayTableBodyEl, data.by_day, (r) => [r.day, String(r.visits), String(r.unique_visitors)]);
   fillTable(pathTableBodyEl, data.by_path, (r) => [
     r.path === "/" ? "/ (home)" : r.path,

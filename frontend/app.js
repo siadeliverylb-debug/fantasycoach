@@ -238,6 +238,35 @@ function loadTeamId() {
 
 teamIdEl.value = loadTeamId();
 
+// Sign-up funnel tracking (admin /admin/visitors "Sign-up funnel"): fire and
+// forget, never allowed to get in the way of what the visitor is doing.
+function track(event, detail) {
+  try {
+    fetch("/api/event", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ event, detail: detail || null }),
+      keepalive: true,
+    }).catch(() => {});
+  } catch {
+    // tracking is best-effort
+  }
+}
+
+// Any link or button marked data-track="<event>" reports a click.
+document.addEventListener("click", (e) => {
+  const el = e.target.closest("[data-track]");
+  if (el) track(el.dataset.track);
+});
+
+let signupStartedTracked = false;
+authFormEl.addEventListener("input", () => {
+  if (authMode === "signup" && !signupStartedTracked) {
+    signupStartedTracked = true;
+    track("signup_started");
+  }
+});
+
 let needsTeamLink = false;
 
 teamFormEl.addEventListener("submit", async (e) => {
@@ -687,8 +716,11 @@ authFormEl.addEventListener("submit", async (e) => {
   requestNotificationPermission(); // tied to this click so the browser will actually prompt
   authErrorEl.textContent = "";
 
+  if (authMode === "signup") track("signup_submitted");
+
   if (authMode === "signup" && !authAgreeEl.checked) {
     authErrorEl.textContent = "Please confirm you understand the advice disclaimer to sign up.";
+    track("signup_error", "Disclaimer box not ticked");
     return;
   }
 
@@ -697,6 +729,7 @@ authFormEl.addEventListener("submit", async (e) => {
   const teamId = authTeamIdEl.value.trim();
   if (authMode === "signup" && teamId && !/^\d+$/.test(teamId)) {
     authErrorEl.textContent = "Your FPL Team ID is digits only - or leave it blank and add it later.";
+    track("signup_error", "Team ID not digits");
     return;
   }
 
@@ -721,6 +754,7 @@ authFormEl.addEventListener("submit", async (e) => {
     showApp(data);
   } catch (err) {
     authErrorEl.textContent = err.message;
+    if (authMode === "signup") track("signup_error", err.message);
   }
 });
 
@@ -2079,6 +2113,7 @@ tryFormEl.addEventListener("submit", async (e) => {
   e.preventDefault();
   const question = tryInputEl.value.trim();
   if (!question) return;
+  track("try_used");
   trySubmitEl.disabled = true;
   tryReplyEl.hidden = false;
   tryReplyEl.classList.add("pending");

@@ -1380,6 +1380,17 @@ header .disclaimer {
   margin: 0 0 12px;
 }
 
+.admin-section-subtitle {
+  font-size: 0.9rem;
+  margin: 18px 0 8px;
+}
+
+.admin-funnel-note {
+  margin: -6px 0 10px;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
 .admin-country-filter-label {
   display: block;
   font-size: 0.82rem;

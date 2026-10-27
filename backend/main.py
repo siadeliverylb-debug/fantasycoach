@@ -240,6 +240,39 @@ def record_visit(req: VisitBeacon, request: Request) -> dict:
     return {"ok": True}
 
 
+class FunnelEvent(BaseModel):
+    event: str
+    detail: str | None = None
+
+
+# Funnel steps that happen in the browser - signup_success and team_linked
+# are logged server-side (see auth.py) so they're exact even if this beacon
+# gets blocked.
+_CLIENT_FUNNEL_EVENTS = db.FUNNEL_EVENT_NAMES - {"signup_success", "team_linked"}
+
+
+@app.post("/api/event")
+def record_funnel_event(req: FunnelEvent, request: Request) -> dict:
+    if req.event not in _CLIENT_FUNNEL_EVENTS:
+        raise HTTPException(400, "Unknown event.")
+    visitor_id = request.cookies.get("visitor_id")
+    if not visitor_id or _is_bot_request(request) or _is_admin_session(request):
+        return {"ok": False}
+    detail = (req.detail or "").strip()[:160] or None
+    db.log_funnel_event(visitor_id, req.event, detail)
+    return {"ok": True}
+
+
+def _is_admin_session(request: Request) -> bool:
+    # Same rule as the visit beacon: the admin's own testing stays out of stats.
+    try:
+        user_id = request.session.get("user_id")
+        user = db.get_user(user_id) if user_id else None
+        return bool(user and user["is_admin"])
+    except Exception:
+        return False
+
+
 db.init_db()
 
 # One-off admin account bootstrap/password reset, no self-serve account
@@ -897,7 +930,7 @@ def admin_usage(admin: dict = Depends(require_admin)) -> list[AdminUserUsage]:
 
 @app.get("/api/admin/visitors")
 def admin_visitors(days: int = 30, country: str | None = None, admin: dict = Depends(require_admin)) -> dict:
-    return db.get_visitor_stats(days=days, country=country)
+    return {**db.get_visitor_stats(days=days, country=country), "funnel": db.get_funnel_stats(days=days, country=country)}
 
 
 @app.post("/api/admin/visitors/clear-mine")

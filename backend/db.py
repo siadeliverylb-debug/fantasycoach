@@ -140,6 +140,19 @@ def init_db() -> None:
                 PRIMARY KEY (day, ip_hash)
             );
 
+            -- Sign-up funnel steps per anonymous visitor (same visitor_id
+            -- cookie as page_visits) - shows where visitors drop off between
+            -- landing and signing up, which page views alone can't.
+            CREATE TABLE IF NOT EXISTS funnel_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                visitor_id TEXT NOT NULL,
+                event TEXT NOT NULL,
+                detail TEXT,
+                created_at TEXT NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_funnel_events_created_at ON funnel_events(created_at);
+
             -- AI-written content for the public /captain-picks and
             -- /differentials pages, kept here rather than in memory so a
             -- deploy or restart doesn't throw it away.
@@ -267,12 +280,84 @@ def log_page_visit(visitor_id: str, path: str, country: str | None = None) -> No
 
 
 def delete_visits_for_visitor(visitor_id: str) -> int:
-    """Wipes all logged page visits for one visitor_id - used to let an admin
-    clear their own dev/testing traffic out of the visitor stats. Returns how
-    many rows were removed."""
+    """Wipes all logged page visits (and funnel events) for one visitor_id -
+    used to let an admin clear their own dev/testing traffic out of the
+    visitor stats. Returns how many page visits were removed."""
     with _connect() as conn:
+        conn.execute("DELETE FROM funnel_events WHERE visitor_id = ?", (visitor_id,))
         cur = conn.execute("DELETE FROM page_visits WHERE visitor_id = ?", (visitor_id,))
         return cur.rowcount
+
+
+# Steps in the order a visitor normally moves through them - the admin
+# funnel table is shown in this order, after "landed on the home page"
+# (which comes from page_visits).
+FUNNEL_STEPS = [
+    ("hero_signup_click", "Clicked \"Sign up free\" (top of home page)"),
+    ("hero_rate_click", "Clicked \"Rate my team free\" (top of home page)"),
+    ("try_used", "Asked SIA a question in the Try box"),
+    ("rate_used", "Rated a team on /rate-my-team"),
+    ("rate_signup_click", "Clicked \"Sign up free\" after a rating"),
+    ("signup_started", "Started filling in the sign-up form"),
+    ("signup_submitted", "Pressed \"Sign up\""),
+    ("signup_error", "Got a sign-up error"),
+    ("signup_success", "Signed up"),
+    ("team_linked", "Linked an FPL team after signing up"),
+]
+FUNNEL_EVENT_NAMES = {name for name, _ in FUNNEL_STEPS}
+
+
+def log_funnel_event(visitor_id: str, event: str, detail: str | None = None) -> None:
+    with _connect() as conn:
+        conn.execute(
+            "INSERT INTO funnel_events (visitor_id, event, detail, created_at) VALUES (?, ?, ?, ?)",
+            (visitor_id, event, detail, datetime.now(timezone.utc).isoformat()),
+        )
+
+
+def get_funnel_stats(days: int = 30, country: str | None = None) -> dict:
+    """Unique visitors reaching each funnel step in the last `days` days, plus
+    the most common sign-up errors. `country` filters by the country the
+    visitor was seen from in page_visits, same as get_visitor_stats."""
+    since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    if country == "Unknown":
+        visitor_clause = " AND visitor_id IN (SELECT visitor_id FROM page_visits WHERE country IS NULL)"
+        params: tuple = ()
+    elif country:
+        visitor_clause = " AND visitor_id IN (SELECT visitor_id FROM page_visits WHERE country = ?)"
+        params = (country,)
+    else:
+        visitor_clause = ""
+        params = ()
+    with _connect() as conn:
+        landed = conn.execute(
+            f"SELECT COUNT(DISTINCT visitor_id) AS n FROM page_visits "
+            f"WHERE path = '/' AND created_at >= ?{visitor_clause}",
+            (since, *params),
+        ).fetchone()["n"]
+        counts = {
+            r["event"]: r["visitors"]
+            for r in conn.execute(
+                f"SELECT event, COUNT(DISTINCT visitor_id) AS visitors FROM funnel_events "
+                f"WHERE created_at >= ?{visitor_clause} GROUP BY event",
+                (since, *params),
+            ).fetchall()
+        }
+        errors = conn.execute(
+            f"""
+            SELECT COALESCE(detail, '(no message)') AS error, COUNT(*) AS times,
+                   COUNT(DISTINCT visitor_id) AS visitors
+            FROM funnel_events
+            WHERE event = 'signup_error' AND created_at >= ?{visitor_clause}
+            GROUP BY error
+            ORDER BY times DESC
+            LIMIT 10
+            """,
+            (since, *params),
+        ).fetchall()
+    steps = [{"event": "landed", "label": "Landed on the home page", "visitors": landed}]
+    steps += [{"event": name, "label": label, "visitors": counts.get(name, 0)} for name, label in FUNNEL_STEPS]
+    return {"steps": steps, "signup_errors": [dict(r) for r in errors]}
 
 
 def get_visitor_stats(days: int = 30, country: str | None = None) -> dict:

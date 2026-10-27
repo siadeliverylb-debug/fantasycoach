@@ -91,7 +91,7 @@
         <strong>Want SIA to fix it?</strong> Sign up free and chat with SIA about your squad every
         gameweek - transfers, captaincy, chips and more.
       </p>
-      <a href="/" class="pricing-cta">Sign up free</a>
+      <a href="/#auth-section" class="pricing-cta" id="rate-signup-cta">Sign up free</a>
     </section>
 
     <p class="disclaimer pricing-disclaimer">
@@ -160,7 +160,19 @@
       resultEl.scrollIntoView({ behavior: "smooth", block: "start" });
     }
 
+    // Sign-up funnel tracking (admin /admin/visitors) - best-effort only.
+    function track(event) {
+      fetch("/api/event", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ event }),
+        keepalive: true,
+      }).catch(() => {});
+    }
+    document.getElementById("rate-signup-cta").addEventListener("click", () => track("rate_signup_click"));
+
     async function rate(teamId) {
+      track("rate_used");
       setStatus("SIA is looking at your squad... this takes about 10-20 seconds.");
       resultEl.hidden = true;
       submitBtn.disabled = true;
