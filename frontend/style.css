@@ -525,6 +525,10 @@ header .disclaimer {
   flex-shrink: 0;
 }
 
+.auth-agree-row a {
+  color: var(--accent-2);
+}
+
 .auth-error {
   color: #ff6b6b;
   font-size: 0.85rem;
@@ -838,6 +842,14 @@ header .disclaimer {
 @media (max-width: 860px) {
   .main-layout {
     flex-direction: column;
+  }
+
+  /* Stacked, the panels' side-by-side "flex: 1 1 0" let the chat panel
+     collapse to nothing while its content spilled over the footer - give
+     each its natural height instead. */
+  .formation-panel,
+  .chat-panel {
+    flex: none;
   }
 }
 
