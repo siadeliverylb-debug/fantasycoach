@@ -5,8 +5,10 @@ import logging
 import os
 import re
 import secrets
+import threading
 import time
 import uuid
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 import requests
@@ -27,7 +29,15 @@ FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 
 logger = logging.getLogger("fantasycoach")
 
-app = FastAPI(title="FPL Assistant")
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    # Keeps the AI-written picks pages generated ahead of visitors - see
+    # _keep_picks_warm. A daemon thread, so it never holds up shutdown.
+    threading.Thread(target=_keep_picks_warm, daemon=True, name="picks-warmer").start()
+    yield
+
+
+app = FastAPI(title="FPL Assistant", lifespan=_lifespan)
 
 _secret_key = os.environ.get("SECRET_KEY")
 if not _secret_key:
@@ -1030,8 +1040,19 @@ def google_site_verification() -> PlainTextResponse:
     return PlainTextResponse((FRONTEND_DIR / "google7b01a54d3d9874e5.html").read_text(encoding="utf-8"))
 
 
-_captain_picks_cache: dict = {"gameweek": None, "generated_at": 0.0, "content": None}
-_CAPTAIN_PICKS_CACHE_TTL_SECONDS = 12 * 60 * 60  # regenerate at most twice a day, or on gameweek rollover
+# AI-written content for /captain-picks and /differentials (and their JSON
+# twins). Generating it takes Claude 40-60s, which used to land on whichever
+# visitor - or search crawler - first hit an empty or expired in-memory cache,
+# including right after every deploy. Now it lives in the database (survives
+# deploys), stale content is served instantly while a fresh copy is written in
+# the background, and _keep_picks_warm refreshes it before visitors notice.
+_PICKS_CACHE_TTL_SECONDS = 12 * 60 * 60  # regenerate at most twice a day, or on gameweek rollover
+_PICKS_WARM_INTERVAL_SECONDS = 10 * 60
+_PICKS_GENERATORS = {
+    "captain_picks": agent.get_captain_picks_content,
+    "differentials": agent.get_differentials_content,
+}
+_picks_locks = {key: threading.Lock() for key in _PICKS_GENERATORS}
 
 
 def _captain_picks_still_fresh(content: dict) -> bool:
@@ -1045,18 +1066,89 @@ def _captain_picks_still_fresh(content: dict) -> bool:
     return all(statuses.get(eid) == "a" for eid in element_ids)
 
 
+def _without_unavailable_picks(content: dict) -> dict:
+    """Stale content shown while a refresh runs still drops any pick who has
+    since been flagged, so an injured player never stays on the page."""
+    element_ids = [p["element"] for p in content.get("picks", []) if "element" in p]
+    statuses = tools.get_players_status(element_ids)
+    picks = [p for p in content.get("picks", []) if "element" not in p or statuses.get(p["element"]) == "a"]
+    return {**content, "picks": picks}
+
+
+def _picks_need_refresh(cached: dict | None, gameweek: int) -> bool:
+    return (
+        cached is None
+        or cached["gameweek"] != gameweek
+        or time.time() - cached["generated_at"] >= _PICKS_CACHE_TTL_SECONDS
+        or not _captain_picks_still_fresh(cached["content"])
+    )
+
+
+def _regenerate_picks(key: str, gameweek: int) -> dict:
+    """Generates and stores fresh content for `key`, at most one run per key
+    at a time - a caller arriving mid-run waits for it and reuses its result
+    rather than paying for a second Claude call."""
+    with _picks_locks[key]:
+        cached = db.get_page_cache(key)
+        if not _picks_need_refresh(cached, gameweek):
+            return cached["content"]
+        content = _PICKS_GENERATORS[key](gameweek)
+        db.set_page_cache(key, gameweek, time.time(), content)
+        return content
+
+
+def _refresh_picks_in_background(key: str, gameweek: int) -> None:
+    if _picks_locks[key].locked():
+        return  # already being refreshed
+
+    def run() -> None:
+        try:
+            _regenerate_picks(key, gameweek)
+        except Exception:
+            logger.exception("Background %s refresh failed for GW%s", key, gameweek)
+
+    threading.Thread(target=run, daemon=True, name=f"refresh-{key}").start()
+
+
+def _get_picks_cached(key: str, gameweek: int) -> dict:
+    cached = db.get_page_cache(key)
+    if cached is not None and cached["gameweek"] == gameweek:
+        if _picks_need_refresh(cached, gameweek):
+            _refresh_picks_in_background(key, gameweek)
+            return _without_unavailable_picks(cached["content"])
+        return cached["content"]
+    # Nothing for this gameweek yet (the very first run, or a gameweek
+    # rollover the warmer hasn't reached) - last week's picks would be wrong,
+    # so this one request has to wait for fresh content.
+    return _regenerate_picks(key, gameweek)
+
+
+def _keep_picks_warm() -> None:
+    """Runs for the life of the process (started from _lifespan): every few
+    minutes, generates picks content that's missing or for a past gameweek -
+    the only cases where a visitor would otherwise have to wait. Expiry and
+    newly flagged players are left to the visit-triggered background refresh
+    in _get_picks_cached, so idle hours don't pay for Claude calls nobody sees."""
+    while True:
+        try:
+            next_deadline = tools.get_next_deadline()
+            if "error" not in next_deadline:
+                gameweek = next_deadline["id"]
+                for key in _PICKS_GENERATORS:
+                    cached = db.get_page_cache(key)
+                    if cached is not None and cached["gameweek"] == gameweek:
+                        continue
+                    try:
+                        _regenerate_picks(key, gameweek)
+                    except Exception:
+                        logger.exception("Warming %s failed for GW%s", key, gameweek)
+        except Exception:
+            logger.exception("Picks warmer couldn't read the next deadline")
+        time.sleep(_PICKS_WARM_INTERVAL_SECONDS)
+
+
 def _get_captain_picks_cached(gameweek: int) -> dict:
-    now = time.time()
-    if (
-        _captain_picks_cache["content"] is not None
-        and _captain_picks_cache["gameweek"] == gameweek
-        and now - _captain_picks_cache["generated_at"] < _CAPTAIN_PICKS_CACHE_TTL_SECONDS
-        and _captain_picks_still_fresh(_captain_picks_cache["content"])
-    ):
-        return _captain_picks_cache["content"]
-    content = agent.get_captain_picks_content(gameweek)
-    _captain_picks_cache.update(gameweek=gameweek, generated_at=now, content=content)
-    return content
+    return _get_picks_cached("captain_picks", gameweek)
 
 
 @app.get("/captain-picks")
@@ -1170,25 +1262,10 @@ def captain_picks_page() -> HTMLResponse:
     return HTMLResponse(html_out)
 
 
-_differentials_cache: dict = {"gameweek": None, "generated_at": 0.0, "content": None}
-_DIFFERENTIALS_CACHE_TTL_SECONDS = 12 * 60 * 60  # regenerate at most twice a day, or on gameweek rollover
-
-
 def _get_differentials_cached(gameweek: int) -> dict:
-    now = time.time()
-    if (
-        _differentials_cache["content"] is not None
-        and _differentials_cache["gameweek"] == gameweek
-        and now - _differentials_cache["generated_at"] < _DIFFERENTIALS_CACHE_TTL_SECONDS
-        # A low-ownership pick going injured/suspended is exactly the kind of
-        # update that should knock it off the page immediately, same
-        # reasoning as _captain_picks_still_fresh.
-        and _captain_picks_still_fresh(_differentials_cache["content"])
-    ):
-        return _differentials_cache["content"]
-    content = agent.get_differentials_content(gameweek)
-    _differentials_cache.update(gameweek=gameweek, generated_at=now, content=content)
-    return content
+    # Same cache, refresh and injury rules as the captain picks - a
+    # low-ownership pick going injured/suspended should leave the page too.
+    return _get_picks_cached("differentials", gameweek)
 
 
 @app.get("/differentials")

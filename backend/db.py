@@ -139,6 +139,16 @@ def init_db() -> None:
                 use_count INTEGER NOT NULL DEFAULT 0,
                 PRIMARY KEY (day, ip_hash)
             );
+
+            -- AI-written content for the public /captain-picks and
+            -- /differentials pages, kept here rather than in memory so a
+            -- deploy or restart doesn't throw it away.
+            CREATE TABLE IF NOT EXISTS page_cache (
+                key TEXT PRIMARY KEY,
+                gameweek INTEGER NOT NULL,
+                generated_at REAL NOT NULL,
+                content TEXT NOT NULL
+            );
         """)
         # Lightweight migration: CREATE TABLE IF NOT EXISTS doesn't alter an
         # already-existing table, so add columns introduced after the table
@@ -875,4 +885,26 @@ def try_release(day: str, ip_hash: str) -> None:
         conn.execute(
             "UPDATE try_usage SET use_count = MAX(use_count - 1, 0) WHERE day = ? AND ip_hash = ?",
             (day, ip_hash),
+        )
+
+
+def get_page_cache(key: str) -> dict | None:
+    with _connect() as conn:
+        row = conn.execute(
+            "SELECT gameweek, generated_at, content FROM page_cache WHERE key = ?", (key,)
+        ).fetchone()
+    if row is None:
+        return None
+    return {"gameweek": row["gameweek"], "generated_at": row["generated_at"], "content": json.loads(row["content"])}
+
+
+def set_page_cache(key: str, gameweek: int, generated_at: float, content: dict) -> None:
+    with _connect() as conn:
+        conn.execute(
+            """
+            INSERT INTO page_cache (key, gameweek, generated_at, content) VALUES (?, ?, ?, ?)
+            ON CONFLICT(key) DO UPDATE SET
+                gameweek = excluded.gameweek, generated_at = excluded.generated_at, content = excluded.content
+            """,
+            (key, gameweek, generated_at, json.dumps(content)),
         )
