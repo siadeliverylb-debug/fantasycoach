@@ -1678,6 +1678,15 @@ header .disclaimer {
   margin: 8px 0 0;
 }
 
+.pricing-upgrade {
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  border-left: 3px solid var(--accent-2);
+  border-radius: 6px;
+  background: var(--bg);
+  line-height: 1.5;
+}
+
 .pricing-cost-table,
 .pricing-compare-table {
   width: 100%;

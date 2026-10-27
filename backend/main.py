@@ -274,7 +274,8 @@ def chat(req: ChatRequest, user: dict = Depends(auth.get_current_user)) -> ChatR
         if chat_used >= free_chat_limit and advice_used >= free_advice_limit and db.get_credits(user["id"]) < 1:
             raise HTTPException(
                 402,
-                f"You've used this week's free messages (GW{gameweek}). Buy credits above for more.",
+                f"You've used this week's free messages (GW{gameweek}). Buy credits above for more - "
+                "any purchase also unlocks SIA's premium AI.",
             )
 
     # Paying users (and admins) get the premium model on every turn - including
