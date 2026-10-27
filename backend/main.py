@@ -468,6 +468,20 @@ def _rate_team_summary(squad_data: dict) -> str:
     lines.append(f"Bank: £{squad_data['bank_m']}m | Free transfers: {squad_data.get('free_transfers')}")
     lines.append(f"Chips still available: {', '.join(chips_left) or 'none'}")
     lines.append(f"Overall rank: {squad_data.get('overall_rank')}")
+
+    transfers = tools.get_transfer_candidates(squad_data["squad"], squad_data["bank_m"], squad_data["gameweek"])
+    lines.append(
+        "\nTransfer candidates - in form, fully fit, not owned, and affordable by selling the most "
+        "expensive owned player in that position plus the bank (clubs already at 3 players excluded):"
+    )
+    for position in ("GKP", "DEF", "MID", "FWD"):
+        for c in transfers["candidates"].get(position, []):
+            xgi = float(c.get("expected_goals") or 0) + float(c.get("expected_assists") or 0)
+            lines.append(
+                f"- {c['web_name']} ({position}, {c['team_short']}) £{c['price_m']}m | form {c['form']}, "
+                f"{c['total_points']} pts, xGI {xgi:.2f}, owned {c['selected_by_percent']}% | "
+                f"next: {c.get('next_fixture') or 'no fixture'}"
+            )
     return "\n".join(lines)
 
 

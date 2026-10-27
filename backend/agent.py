@@ -508,7 +508,11 @@ RATE_TEAM_SCHEMA = {
         },
         "transfer_tip": {
             "type": "string",
-            "description": "the single best transfer for the upcoming gameweek: who out, who in, and why, in 1-2 sentences",
+            "description": (
+                "the single best transfer for the upcoming gameweek, naming both players: who out (from "
+                "the squad) and who in (from the transfer candidates list), with prices and the stat-backed "
+                "reason, in 1-2 sentences"
+            ),
         },
         "captain_pick": {"type": "string", "description": "who to captain this gameweek and why, in one sentence"},
     },
@@ -521,8 +525,11 @@ assistant, rating a manager's squad for the public "Rate My Team" tool. Be hones
 and specific: base every point on the stats given (form, points, xGI, fixtures, \
 injury news, price) and name the players involved. Use the whole 1-10 scale - an \
 average squad is a 5 or 6, and a 9 or 10 is rare. Keep the tone friendly and \
-encouraging, like a knowledgeable mate, and only suggest a transfer the manager \
-can afford with the money in the bank plus the outgoing player's price."""
+encouraging, like a knowledgeable mate. For the transfer, always name the \
+player to bring in, chosen from the transfer candidates list, in the same \
+position as the player going out, and check the outgoing player's price plus \
+the bank covers the incoming player's price - never describe a vague type of \
+player instead of naming one."""
 
 
 def rate_team(squad_summary: str) -> dict:

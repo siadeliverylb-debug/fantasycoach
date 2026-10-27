@@ -295,6 +295,53 @@ def get_players_stats(element_ids: list[int]) -> dict[int, dict]:
     }
 
 
+MAX_PLAYERS_PER_CLUB = 3  # current FPL squad rule
+
+
+def get_transfer_candidates(squad: list[dict], bank_m: float, gameweek: int, per_position: int = 5) -> dict:
+    """In-form, fully fit players a manager could actually buy, per position -
+    so a one-shot rating (no tool loop) can name a real transfer target
+    instead of a vague "a forward under £6.3m". Priced within what the most
+    expensive owned player in that position would raise plus the bank, not
+    already owned, and not from a club the manager already has 3 players of."""
+    positions = _positions()
+    teams = _teams()
+    owned_ids = {p["element"] for p in squad}
+    club_counts: dict[str, int] = {}
+    max_budget_by_position: dict[str, float] = {}
+    for p in squad:
+        club_counts[p["team_short"]] = club_counts.get(p["team_short"], 0) + 1
+        max_budget_by_position[p["position"]] = max(
+            max_budget_by_position.get(p["position"], 0), round(p["price_m"] + bank_m, 1)
+        )
+    full_clubs = {club for club, n in club_counts.items() if n >= MAX_PLAYERS_PER_CLUB}
+
+    by_position: dict[str, list[dict]] = {}
+    for p in fpl.get_bootstrap()["elements"]:
+        position = positions.get(p["element_type"])
+        team_short = teams.get(p["team"], {}).get("short_name")
+        if (
+            p["id"] in owned_ids
+            or p["status"] != "a"
+            or team_short in full_clubs
+            or p["now_cost"] / 10 > max_budget_by_position.get(position, 0)
+        ):
+            continue
+        by_position.setdefault(position, []).append(p)
+
+    candidates = {}
+    for position, players in by_position.items():
+        players.sort(key=lambda p: (float(p["form"] or 0), p["total_points"]), reverse=True)
+        picked = []
+        for p in players[:per_position]:
+            fixture = _fixture_for_team(p["team"], gameweek)
+            stats = _serialize_player(p)
+            stats["next_fixture"] = _fixture_label(fixture, p["team"]) if fixture else None
+            picked.append(stats)
+        candidates[position] = picked
+    return {"max_budget_by_position": max_budget_by_position, "candidates": candidates}
+
+
 CHIP_NAMES = {
     "wildcard": "Wildcard",
     "freehit": "Free Hit",
