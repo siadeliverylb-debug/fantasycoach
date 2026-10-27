@@ -1157,6 +1157,11 @@ def pricing() -> HTMLResponse:
     return _render_page("pricing.html", "style.css", "logo.jpg", "favicon.png")
 
 
+@app.get("/privacy")
+def privacy() -> HTMLResponse:
+    return _render_page("privacy.html", "style.css", "logo.jpg", "favicon.png")
+
+
 @app.get("/admin")
 def admin_page() -> HTMLResponse:
     # Not gated here - the page's own fetches to /api/admin/* are the real
