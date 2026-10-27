@@ -277,9 +277,14 @@ def chat(req: ChatRequest, user: dict = Depends(auth.get_current_user)) -> ChatR
                 f"You've used this week's free messages (GW{gameweek}). Buy credits above for more.",
             )
 
+    # Paying users (and admins) get the premium model on every turn - including
+    # their weekly free messages - while everyone else, signup bonus credits
+    # included, gets agent.FREE_MODEL. Decided up front by who the user is, not
+    # by this turn's billing tier, which isn't known until the reply is back.
+    premium = bool(is_admin or is_golden or db.has_purchased(user["id"]))
     history = [m.model_dump() for m in req.history]
     try:
-        reply = agent.chat(history, team_id=req.team_id, user_id=user["id"])
+        reply = agent.chat(history, team_id=req.team_id, user_id=user["id"], premium=premium)
     except Exception:
         # An unhandled error here (Claude API rate limit, timeout, network
         # blip) would otherwise bubble up as a bare 500 with a plain-text body -
@@ -689,9 +694,8 @@ def admin_usage(admin: dict = Depends(require_admin)) -> list[AdminUserUsage]:
     rows = db.get_usage_summary()
     out = []
     for r in rows:
-        api_cost = (
-            r["input_tokens"] / 1_000_000 * agent.INPUT_PRICE_PER_MTOK
-            + r["output_tokens"] / 1_000_000 * agent.OUTPUT_PRICE_PER_MTOK
+        api_cost = sum(
+            agent.api_cost_usd(m["model"], m["input_tokens"], m["output_tokens"]) for m in r["tokens_by_model"]
         )
         team_name = manager_name = None
         free_transfers = None

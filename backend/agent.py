@@ -9,13 +9,30 @@ import anthropic
 from . import db, tools
 
 MODEL = "claude-opus-5"
+# Chat for anyone who hasn't paid (free weekly messages, signup bonus credits,
+# the landing-page "try SIA" box, Telegram) - ~50x cheaper per token than
+# MODEL, which on Opus made every active free user cost more than the average
+# paying user brought in. Paying users stay on MODEL (see chat(premium=...)).
+FREE_MODEL = "claude-haiku-5-5"
 CLASSIFIER_MODEL = "claude-sonnet-5"  # cheap on-topic check, doesn't need Opus-tier reasoning
 MAX_TOKENS = 16000
 
-# Live Claude API rates for MODEL (https://platform.claude.com/docs/en/about-claude/pricing),
-# used only for the admin usage dashboard's cost estimate - not sent to the API.
-INPUT_PRICE_PER_MTOK = 5.0
-OUTPUT_PRICE_PER_MTOK = 25.0
+# Live Claude API rates per model as (input, output) $/MTok
+# (https://platform.claude.com/docs/en/about-claude/pricing), used only for the
+# admin usage dashboard's cost estimate - not sent to the API.
+PRICES_PER_MTOK = {
+    "claude-opus-5": (5.0, 25.0),
+    "claude-sonnet-5": (2.0, 10.0),
+    "claude-haiku-5-5": (0.10, 0.50),
+}
+
+
+def api_cost_usd(model: str | None, input_tokens: int, output_tokens: int) -> float:
+    # Rows logged before the model was recorded were all MODEL-priced - and an
+    # unknown model is priced as MODEL too, so the dashboard errs high, not low.
+    input_price, output_price = PRICES_PER_MTOK.get(model or MODEL, PRICES_PER_MTOK[MODEL])
+    return input_tokens / 1_000_000 * input_price + output_tokens / 1_000_000 * output_price
+
 
 SYSTEM_PROMPT = """You are SIA, the Fantasy Coach app's FPL (Fantasy Premier \
 League) assistant. You help users with player stats, fixture planning, \
@@ -262,12 +279,12 @@ def _get_client() -> anthropic.Anthropic:
     return _client
 
 
-def _log_usage(user_id: int | None, endpoint: str, response) -> None:
+def _log_usage(user_id: int | None, endpoint: str, model: str, response) -> None:
     if user_id is None:
         return
     usage = response.usage
     input_tokens = usage.input_tokens + (usage.cache_creation_input_tokens or 0) + (usage.cache_read_input_tokens or 0)
-    db.log_token_usage(user_id, endpoint, input_tokens, usage.output_tokens)
+    db.log_token_usage(user_id, endpoint, model, input_tokens, usage.output_tokens)
 
 
 def _classify_message(message: str, user_id: int | None = None) -> tuple[bool, str | None]:
@@ -290,7 +307,7 @@ def _classify_message(message: str, user_id: int | None = None) -> tuple[bool, s
         messages=[{"role": "user", "content": message}],
         output_config={"format": {"type": "json_schema", "schema": SCOPE_CLASSIFIER_SCHEMA}},
     )
-    _log_usage(user_id, "classifier", response)
+    _log_usage(user_id, "classifier", CLASSIFIER_MODEL, response)
     text = next((b.text for b in response.content if b.type == "text"), "")
     try:
         parsed = json.loads(text)
@@ -301,10 +318,16 @@ def _classify_message(message: str, user_id: int | None = None) -> tuple[bool, s
         return True, None
 
 
-def chat(history: list[dict], team_id: str | None = None, user_id: int | None = None) -> str:
+def chat(
+    history: list[dict], team_id: str | None = None, user_id: int | None = None, premium: bool = False
+) -> str:
     """history: list of {'role': 'user'|'assistant', 'content': str}, ending in
     the newest user message. Runs the tool-use loop internally and returns the
-    final assistant reply as plain text."""
+    final assistant reply as plain text.
+
+    premium picks MODEL over FREE_MODEL - defaults to False so a new caller
+    can't silently put unpaid traffic on Opus."""
+    model = MODEL if premium else FREE_MODEL
     latest_user = next((m["content"] for m in reversed(history) if m["role"] == "user"), "")
     skill = None
     if latest_user:
@@ -335,13 +358,13 @@ def chat(history: list[dict], team_id: str | None = None, user_id: int | None = 
 
     while True:
         response = client.messages.create(
-            model=MODEL,
+            model=model,
             max_tokens=MAX_TOKENS,
             system=system,
             tools=_CACHED_TOOLS,
             messages=messages,
         )
-        _log_usage(user_id, "chat", response)
+        _log_usage(user_id, "chat", model, response)
 
         if response.stop_reason == "tool_use":
             messages.append({"role": "assistant", "content": response.content})
@@ -444,7 +467,7 @@ def get_draft_advice_structured(
             messages=messages,
             output_config={"format": {"type": "json_schema", "schema": DRAFT_ADVICE_SCHEMA}},
         )
-        _log_usage(user_id, "draft_advice", response)
+        _log_usage(user_id, "draft_advice", MODEL, response)
 
         if response.stop_reason == "tool_use":
             messages.append({"role": "assistant", "content": response.content})
@@ -531,7 +554,7 @@ def get_captain_picks_content(gameweek: int) -> dict:
             messages=messages,
             output_config={"format": {"type": "json_schema", "schema": CAPTAIN_PICKS_SCHEMA}},
         )
-        _log_usage(None, "captain_picks", response)
+        _log_usage(None, "captain_picks", MODEL, response)
 
         if response.stop_reason == "tool_use":
             messages.append({"role": "assistant", "content": response.content})
@@ -630,7 +653,7 @@ def get_differentials_content(gameweek: int) -> dict:
             messages=messages,
             output_config={"format": {"type": "json_schema", "schema": DIFFERENTIALS_SCHEMA}},
         )
-        _log_usage(None, "differentials", response)
+        _log_usage(None, "differentials", MODEL, response)
 
         if response.stop_reason == "tool_use":
             messages.append({"role": "assistant", "content": response.content})

@@ -46,6 +46,7 @@ def init_db() -> None:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL REFERENCES users(id),
                 endpoint TEXT NOT NULL,
+                model TEXT,
                 input_tokens INTEGER NOT NULL,
                 output_tokens INTEGER NOT NULL,
                 created_at TEXT NOT NULL
@@ -168,6 +169,12 @@ def init_db() -> None:
 
         if "team_id" not in user_columns:
             conn.execute("ALTER TABLE users ADD COLUMN team_id TEXT")
+
+        token_usage_columns = {row["name"] for row in conn.execute("PRAGMA table_info(token_usage)")}
+        if "model" not in token_usage_columns:
+            # NULL for rows logged before free chat moved off Opus - priced as
+            # agent.MODEL by agent.api_cost_usd().
+            conn.execute("ALTER TABLE token_usage ADD COLUMN model TEXT")
 
         # SQLite can't add a UNIQUE column via ALTER TABLE, so the one-account-
         # per-FPL-team-ID rule is enforced with a partial unique index instead -
@@ -535,13 +542,21 @@ def spend_credits(user_id: int, n: int = 1) -> None:
             )
 
 
-def log_token_usage(user_id: int, endpoint: str, input_tokens: int, output_tokens: int) -> None:
+def log_token_usage(user_id: int, endpoint: str, model: str, input_tokens: int, output_tokens: int) -> None:
     with _connect() as conn:
         conn.execute(
-            "INSERT INTO token_usage (user_id, endpoint, input_tokens, output_tokens, created_at) "
-            "VALUES (?, ?, ?, ?, ?)",
-            (user_id, endpoint, input_tokens, output_tokens, datetime.now(timezone.utc).isoformat()),
+            "INSERT INTO token_usage (user_id, endpoint, model, input_tokens, output_tokens, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (user_id, endpoint, model, input_tokens, output_tokens, datetime.now(timezone.utc).isoformat()),
         )
+
+
+def has_purchased(user_id: int) -> bool:
+    """True once a user has ever paid real money - what earns them the premium
+    chat model, rather than credits alone (every signup gets bonus credits)."""
+    with _connect() as conn:
+        row = conn.execute("SELECT 1 FROM purchases WHERE user_id = ? LIMIT 1", (user_id,)).fetchone()
+    return row is not None
 
 
 def record_purchase(user_id: int, credits: int, amount_cents: int, provider_reference: str | None = None) -> bool:
@@ -661,10 +676,23 @@ def get_usage_summary() -> list[dict]:
             ORDER BY u.id
             """
         ).fetchall()
+        # Per-model split so the dashboard can price each model at its own
+        # rate - free chat on the cheap model would otherwise read as Opus cost.
+        model_rows = conn.execute(
+            """
+            SELECT user_id, model, SUM(input_tokens) AS input_tokens, SUM(output_tokens) AS output_tokens
+            FROM token_usage
+            GROUP BY user_id, model
+            """
+        ).fetchall()
+    tokens_by_model: dict[int, list[dict]] = {}
+    for r in model_rows:
+        tokens_by_model.setdefault(r["user_id"], []).append(dict(r))
     users = [dict(r) for r in rows]
     for u in users:
         u["is_admin"] = bool(u["is_admin"])
         u["is_golden"] = is_golden_active(u["golden_until"])
+        u["tokens_by_model"] = tokens_by_model.get(u["id"], [])
     return users
 
 
