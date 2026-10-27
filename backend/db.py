@@ -365,10 +365,11 @@ def reset_password(email: str, new_password: str) -> bool:
         return cur.rowcount > 0
 
 
-def create_user(email: str, password: str, team_id: str, referred_by: int | None = None) -> int:
+def create_user(email: str, password: str, team_id: str | None, referred_by: int | None = None) -> int:
     """Raises sqlite3.IntegrityError (message mentions "team_id") if team_id is
     already registered to another account - one FPL team can only back one
-    account, to stop a single person farming signup bonuses with N accounts."""
+    account, to stop a single person farming signup bonuses with N accounts.
+    team_id may be None (linked later via auth.link_team)."""
     salt = secrets.token_bytes(16)
     password_hash = _hash_password(password, salt)
     email_norm = email.lower().strip()
@@ -425,8 +426,9 @@ def get_user(user_id: int) -> dict | None:
 
 
 def set_team_id(user_id: int, team_id: str | None) -> None:
-    """Admin-only correction for a team ID entered wrong at signup (there's no
-    self-serve way to change it, since it's the one-account-per-FPL-team
+    """Sets a user's team ID - the admin correction for a wrong ID, and the
+    one-time self-serve link for accounts created without one (changing an
+    existing ID stays admin-only, since it's the one-account-per-FPL-team
     unique key). Raises ValueError if another account already owns that ID."""
     with _connect() as conn:
         try:

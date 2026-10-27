@@ -238,9 +238,35 @@ function loadTeamId() {
 
 teamIdEl.value = loadTeamId();
 
-teamFormEl.addEventListener("submit", (e) => {
+let needsTeamLink = false;
+
+teamFormEl.addEventListener("submit", async (e) => {
   e.preventDefault();
   const value = teamIdEl.value.trim();
+  if (needsTeamLink) {
+    // A non-admin account with no team yet - link it on the server, which
+    // locks it to this team from now on.
+    if (!/^\d+$/.test(value)) {
+      teamStatusEl.textContent = "Your FPL Team ID is digits only.";
+      return;
+    }
+    teamStatusEl.textContent = "Linking...";
+    try {
+      const res = await fetch("/api/me/team-id", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ team_id: value }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || "Couldn't link that team - please try again.");
+      teamStatusEl.textContent = "Linked!";
+      setTimeout(() => { teamStatusEl.textContent = ""; }, 2000);
+      showApp(data);
+    } catch (err) {
+      teamStatusEl.textContent = err.message;
+    }
+    return;
+  }
   try {
     if (value) {
       localStorage.setItem("fplTeamId", value);
@@ -494,7 +520,6 @@ function setAuthMode(mode) {
   authSubmitEl.textContent = mode === "login" ? "Log in" : "Sign up";
   authPasswordEl.autocomplete = mode === "login" ? "current-password" : "new-password";
   authTeamIdEl.hidden = mode !== "signup";
-  authTeamIdEl.required = mode === "signup";
   authTeamIdHelpBtnEl.hidden = mode !== "signup";
   authTeamIdHelpEl.hidden = true;
   authAgreeRowEl.hidden = mode !== "signup";
@@ -567,6 +592,7 @@ function showApp(account) {
   // and always reflects the account's team rather than implying it's free-form.
   // Admins can still browse any team (matches the backend's admin bypass).
   if (currentUserIsAdmin) {
+    needsTeamLink = false;
     if (account.team_id && !loadTeamId()) {
       try {
         localStorage.setItem("fplTeamId", account.team_id);
@@ -578,9 +604,13 @@ function showApp(account) {
     teamIdEl.readOnly = false;
     teamFormSaveBtnEl.hidden = false;
   } else {
+    // Accounts created without a team ID get one chance to link it here;
+    // after that it's locked to that team like a signup-time ID.
+    needsTeamLink = !account.team_id;
     teamIdEl.value = account.team_id || "";
-    teamIdEl.readOnly = true;
-    teamFormSaveBtnEl.hidden = true;
+    teamIdEl.readOnly = !needsTeamLink;
+    teamIdEl.placeholder = needsTeamLink ? "Enter your FPL Team ID to see your squad" : "";
+    teamFormSaveBtnEl.hidden = !needsTeamLink;
     try {
       localStorage.setItem("fplTeamId", account.team_id || "");
     } catch {
@@ -662,16 +692,20 @@ authFormEl.addEventListener("submit", async (e) => {
     return;
   }
 
+  // The team ID is optional at signup - most visitors are on a phone and the
+  // FPL app never shows it, so they can link it from inside the app later.
   const teamId = authTeamIdEl.value.trim();
-  if (authMode === "signup" && !/^\d+$/.test(teamId)) {
-    authErrorEl.textContent = "Please enter your numeric FPL Team ID to sign up.";
+  if (authMode === "signup" && teamId && !/^\d+$/.test(teamId)) {
+    authErrorEl.textContent = "Your FPL Team ID is digits only - or leave it blank and add it later.";
     return;
   }
 
   const email = authEmailEl.value.trim();
   const password = authPasswordEl.value;
   const payload =
-    authMode === "signup" ? { email, password, team_id: teamId, ref: referralCode } : { email, password };
+    authMode === "signup"
+      ? { email, password, team_id: teamId || null, ref: referralCode }
+      : { email, password };
 
   try {
     const res = await fetch(`/api/${authMode === "login" ? "login" : "signup"}`, {
@@ -1171,7 +1205,13 @@ function setSquadViewMode(mode) {
 async function loadSquad() {
   const teamId = loadTeamId();
   if (!teamId) {
-    showSquadPlaceholder("Save your FPL Team ID above to see your formation.");
+    showSquadPlaceholder(
+      needsTeamLink
+        ? "Add your FPL Team ID above to see your squad. To find it, open fantasy.premierleague.com in a " +
+          "browser, go to Points, and copy the number in the address (…/entry/1234567/…). " +
+          "You can already chat with SIA meanwhile."
+        : "Save your FPL Team ID above to see your formation."
+    );
     return;
   }
   setSquadViewMode("live");
