@@ -296,6 +296,7 @@ FUNNEL_STEPS = [
     ("hero_signup_click", "Clicked \"Sign up free\" (top of home page)"),
     ("hero_rate_click", "Clicked \"Rate my team free\" (top of home page)"),
     ("try_used", "Asked SIA a question in the Try box"),
+    ("rate_picker_opened", "Opened \"Pick my players\" on /rate-my-team (no Team ID)"),
     ("rate_used", "Rated a team on /rate-my-team"),
     ("rate_signup_click", "Clicked \"Sign up free\" after a rating"),
     ("signup_started", "Started filling in the sign-up form"),

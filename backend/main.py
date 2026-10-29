@@ -466,21 +466,29 @@ def try_sia(req: TryRequest, request: Request) -> TryResponse:
 
 
 # Public "Rate My Team" tool - no account needed, so it's a top-of-funnel hook
-# that anyone can share. Ratings are cached per team and gameweek, so a shared
-# link (/rate-my-team?team=123) is served from cache and never costs another
-# model call - only fresh ratings count against these limits.
+# that anyone can share. A squad comes either from an FPL Team ID or from 15
+# players picked by hand (most phone visitors can't find their Team ID - the
+# FPL app never shows it). Ratings are cached per squad and gameweek, so a
+# shared link (/rate-my-team?team=123 or ?players=1,2,...) is served from
+# cache and never costs another model call - only fresh ratings count
+# against these limits.
 RATE_PER_IP_PER_DAY = 3
 RATE_GLOBAL_PER_DAY = 300
 _RATE_CACHE_MAX = 5000
-_rating_cache: dict[tuple[int, int], dict] = {}
+_rating_cache: dict[tuple, dict] = {}
 
 
 class RateTeamRequest(BaseModel):
     team_id: str
 
 
+class RatePlayersRequest(BaseModel):
+    players: list[int]
+
+
 class RateTeamResponse(BaseModel):
-    team_id: int
+    team_id: int | None = None
+    players: list[int] | None = None
     team_name: str | None
     gameweek: int
     score: int
@@ -493,7 +501,15 @@ class RateTeamResponse(BaseModel):
 
 def _rate_team_summary(squad_data: dict) -> str:
     stats = tools.get_players_stats([p["element"] for p in squad_data["squad"]])
-    lines = [f"Gameweek {squad_data['gameweek']} squad:"]
+    manual = squad_data.get("picked_manually")
+    lines = [
+        f"Gameweek {squad_data['gameweek']} squad"
+        + (
+            " (picked by hand on the site, not from FPL - starting XI, captain, bank and free "
+            "transfers aren't known, so judge the 15 as a whole and assume £0.0m in the bank):"
+            if manual else ":"
+        )
+    ]
     for p in squad_data["squad"]:
         s = stats.get(p["element"], {})
         role = " (C)" if p["is_captain"] else " (VC)" if p["is_vice_captain"] else ""
@@ -507,10 +523,11 @@ def _rate_team_summary(squad_data: dict) -> str:
         if p.get("status") != "a":
             line += f" | {p.get('news') or 'not fully fit'}"
         lines.append(line)
-    chips_left = [c["name"] for c in squad_data.get("chips", []) if not c["used"]]
-    lines.append(f"Bank: £{squad_data['bank_m']}m | Free transfers: {squad_data.get('free_transfers')}")
-    lines.append(f"Chips still available: {', '.join(chips_left) or 'none'}")
-    lines.append(f"Overall rank: {squad_data.get('overall_rank')}")
+    if not manual:
+        chips_left = [c["name"] for c in squad_data.get("chips", []) if not c["used"]]
+        lines.append(f"Bank: £{squad_data['bank_m']}m | Free transfers: {squad_data.get('free_transfers')}")
+        lines.append(f"Chips still available: {', '.join(chips_left) or 'none'}")
+        lines.append(f"Overall rank: {squad_data.get('overall_rank')}")
 
     transfers = tools.get_transfer_candidates(squad_data["squad"], squad_data["bank_m"], squad_data["gameweek"])
     lines.append(
@@ -539,14 +556,49 @@ def rate_team(req: RateTeamRequest, request: Request) -> RateTeamResponse:
     team_id = int(team_id_str)
     gameweek = _current_gameweek()
 
-    cached = _rating_cache.get((team_id, gameweek))
+    cache_key = ("team", team_id, gameweek)
+    cached = _rating_cache.get(cache_key)
     if cached:
         return RateTeamResponse(**cached)
 
     squad_data = tools.get_next_gameweek_squad(team_id)
     if "error" in squad_data:
         raise HTTPException(404, "Couldn't find that FPL team - check the team ID and try again.")
+    return _rate_squad(squad_data, cache_key, {"team_id": team_id}, request)
 
+
+@app.post("/api/rate-team/players", response_model=RateTeamResponse)
+def rate_picked_players(req: RatePlayersRequest, request: Request) -> RateTeamResponse:
+    _require_not_in_maintenance()
+    if _is_bot_request(request):
+        raise HTTPException(403, "Not available.")
+    gameweek = _current_gameweek()
+    players = sorted(set(req.players))
+
+    cache_key = ("players", tuple(players), gameweek)
+    cached = _rating_cache.get(cache_key)
+    if cached:
+        return RateTeamResponse(**cached)
+
+    squad_data = tools.build_picked_squad(req.players)
+    if "error" in squad_data:
+        raise HTTPException(400, squad_data["error"])
+    return _rate_squad(squad_data, cache_key, {"players": players}, request)
+
+
+@app.get("/api/public/players")
+def public_players(q: str = "", position: str | None = None) -> dict:
+    # Read-only FPL player data from the shared bootstrap cache, for the
+    # Rate My Team picker - no account needed.
+    if position is not None and position not in tools.SQUAD_SHAPE:
+        raise HTTPException(400, "Unknown position.")
+    return {"players": tools.browse_players(q[:40], position)}
+
+
+def _rate_squad(squad_data: dict, cache_key: tuple, identity: dict, request: Request) -> RateTeamResponse:
+    """Rate-limits, rates and caches one squad - shared by the Team ID and
+    picked-players endpoints. `identity` is what the response (and its share
+    link) identifies the squad by."""
     day = time.strftime("%Y-%m-%d", time.gmtime())
     # Same try_usage table as /api/try, under its own day key so the two
     # tools' allowances stay separate.
@@ -562,18 +614,18 @@ def rate_team(req: RateTeamRequest, request: Request) -> RateTeamResponse:
         rating = agent.rate_team(_rate_team_summary(squad_data))
     except Exception:
         db.try_release(rate_day, ip_hash)
-        logger.exception("agent.rate_team() failed for team_id=%s", team_id)
+        logger.exception("agent.rate_team() failed for %s", cache_key)
         raise HTTPException(503, "SIA is temporarily unavailable - please try again in a moment.")
 
     result = {
-        "team_id": team_id,
+        **identity,
         "team_name": squad_data.get("team_name"),
-        "gameweek": gameweek,
+        "gameweek": squad_data["gameweek"],
         **{k: rating[k] for k in ("score", "headline", "strengths", "weaknesses", "transfer_tip", "captain_pick")},
     }
     if len(_rating_cache) >= _RATE_CACHE_MAX:
         _rating_cache.clear()
-    _rating_cache[(team_id, gameweek)] = result
+    _rating_cache[cache_key] = result
     return RateTeamResponse(**result)
 
 

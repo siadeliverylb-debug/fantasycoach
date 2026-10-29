@@ -296,6 +296,68 @@ def get_players_stats(element_ids: list[int]) -> dict[int, dict]:
 
 
 MAX_PLAYERS_PER_CLUB = 3  # current FPL squad rule
+SQUAD_SHAPE = {"GKP": 2, "DEF": 5, "MID": 5, "FWD": 3}  # current FPL 15-man squad rule
+
+
+def browse_players(query: str = "", position: str | None = None, limit: int = 20) -> list[dict]:
+    """Player list for the public Rate My Team picker: a name search, or - with
+    no query - the most-owned players, optionally for one position, since most
+    squads are built around them."""
+    positions = _positions()
+    teams = _teams()
+    query = query.strip()
+    pool = _find_players(query, 200) if query else list(fpl.get_bootstrap()["elements"])
+    if position:
+        pool = [p for p in pool if positions.get(p["element_type"]) == position]
+    if not query:
+        pool.sort(key=lambda p: float(p["selected_by_percent"] or 0), reverse=True)
+    return [
+        {
+            "id": p["id"],
+            "web_name": p["web_name"],
+            "team_short": teams.get(p["team"], {}).get("short_name"),
+            "position": positions.get(p["element_type"]),
+            "price_m": p["now_cost"] / 10,
+            "selected_by_percent": p["selected_by_percent"],
+            "status": p["status"],
+        }
+        for p in pool[:limit]
+    ]
+
+
+def build_picked_squad(element_ids: list[int]) -> dict:
+    """A 15-man squad picked by hand (for visitors without their FPL Team ID),
+    checked against FPL's squad rules and shaped like get_next_gameweek_squad
+    so the rating code treats both the same. {"error": ...} if it's invalid."""
+    if len(element_ids) != 15 or len(set(element_ids)) != 15:
+        return {"error": "Pick exactly 15 different players."}
+    picks = [{"element": e, "is_captain": False, "is_vice_captain": False, "multiplier": 1} for e in element_ids]
+    squad, _ = resolve_picks(picks)
+    if len(squad) != 15:
+        return {"error": "Some of those players couldn't be found - please pick again."}
+    counts: dict[str, int] = {}
+    clubs: dict[str, int] = {}
+    for p in squad:
+        counts[p["position"]] = counts.get(p["position"], 0) + 1
+        clubs[p["team_short"]] = clubs.get(p["team_short"], 0) + 1
+    if counts != SQUAD_SHAPE:
+        return {"error": "A squad needs 2 goalkeepers, 5 defenders, 5 midfielders and 3 forwards."}
+    over = [club for club, n in clubs.items() if n > MAX_PLAYERS_PER_CLUB]
+    if over:
+        return {"error": f"Max {MAX_PLAYERS_PER_CLUB} players per club - you have more from {over[0]}."}
+    next_gw = get_next_deadline()
+    if "error" in next_gw:
+        return next_gw
+    return {
+        "team_name": None,
+        "gameweek": next_gw["id"],
+        "squad": squad,
+        "bank_m": 0.0,
+        "free_transfers": None,
+        "chips": [],
+        "overall_rank": None,
+        "picked_manually": True,
+    }
 
 
 def get_transfer_candidates(squad: list[dict], bank_m: float, gameweek: int, per_position: int = 5) -> dict:
